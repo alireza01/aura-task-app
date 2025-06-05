@@ -9,9 +9,11 @@ interface DraggableTaskCardProps {
   task: Task
   onComplete: (taskId: string, completed: boolean) => Promise<void>
   onUpdate: () => void
+  onEdit?: (task: Task) => void
+  onDelete?: (taskId: string) => void
 }
 
-export function DraggableTaskCard({ task, onComplete, onUpdate }: DraggableTaskCardProps) {
+export function DraggableTaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: DraggableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id })
 
   const style = {
@@ -21,7 +23,7 @@ export function DraggableTaskCard({ task, onComplete, onUpdate }: DraggableTaskC
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} onComplete={onComplete} onUpdate={onUpdate} />
+      <TaskCard task={task} onComplete={onComplete} onUpdate={onUpdate} onEdit={onEdit} onDelete={onDelete} />
     </div>
   )
 }

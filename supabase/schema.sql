@@ -104,3 +104,55 @@ CREATE TRIGGER update_task_groups_updated_at
 CREATE TRIGGER update_tasks_updated_at 
   BEFORE UPDATE ON tasks 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE IF NOT EXISTS tags (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS task_tags (
+  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (task_id, tag_id)
+);
+
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_tags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own tags" ON tags
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can read their own task_tags" ON task_tags
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tasks
+      WHERE tasks.id = task_tags.task_id AND tasks.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert task_tags for their own tasks" ON task_tags
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM tasks
+      WHERE tasks.id = task_tags.task_id AND tasks.user_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1 FROM tags
+      WHERE tags.id = task_tags.tag_id AND tags.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete task_tags for their own tasks" ON task_tags
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM tasks
+      WHERE tasks.id = task_tags.task_id AND tasks.user_id = auth.uid()
+    )
+  );
+
+CREATE INDEX idx_task_tags_task_id ON task_tags(task_id);
+CREATE INDEX idx_task_tags_tag_id ON task_tags(tag_id);

@@ -9,12 +9,12 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { motion } from "framer-motion"
 import { Palette, Moon, Sun, Sparkles } from "lucide-react"
-import type { UserSettings } from "@/types"
+import type { UserSettings, GuestUser } from "@/types"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTheme } from "@/components/theme/theme-provider"
 
 interface ThemeSelectorProps {
-  user: User | null
+  user: User | GuestUser | null
   settings: UserSettings | null
   onSettingsChange: () => void
 }
@@ -44,7 +44,7 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
         // Update theme immediately for better UX
         setTheme(debouncedTheme as any)
 
-        if (user) {
+        if (user && !("isGuest" in user)) { // Only save to Supabase if it's an authenticated user
           const { error } = await supabase.from("user_settings").upsert({
             user_id: user.id,
             theme: debouncedTheme,

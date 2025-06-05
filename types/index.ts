@@ -5,7 +5,7 @@ export interface Task {
   description?: string
   completed: boolean
   completed_at?: string | null
-  group_id?: string
+  group_id?: string | null
   speed_score?: number
   importance_score?: number
   emoji?: string

@@ -14,10 +14,10 @@ import ApiKeyManager from "@/components/settings/api-key-manager"
 import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
 import ThemeSelector from "@/components/settings/theme-selector"
 import AccountActions from "@/components/settings/account-actions"
-import type { UserSettings } from "@/types"
+import type { UserSettings, GuestUser } from "@/types"
 
 interface SettingsPanelProps {
-  user: User
+  user: User | GuestUser | null
   settings: UserSettings | null
   isOpen: boolean
   onClose: () => void
@@ -110,8 +110,12 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
                 </TabsList>
 
                 <TabsContent value="ai" className="space-y-6 py-4">
-                  <ApiKeyManager user={user} settings={settings} onSettingsChange={handleSettingsChange} />
-                  <AiBehaviorCustomizer user={user} settings={settings} onSettingsChange={handleSettingsChange} />
+                  {user && !("isGuest" in user) && (
+                    <>
+                      <ApiKeyManager user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
+                      <AiBehaviorCustomizer user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
+                    </>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="appearance" className="space-y-6 py-4">
@@ -119,7 +123,9 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
                 </TabsContent>
 
                 <TabsContent value="account" className="space-y-6 py-4">
-                  <AccountActions user={user} />
+                  {user && !("isGuest" in user) && (
+                    <AccountActions user={user as User} />
+                  )}
                 </TabsContent>
               </Tabs>
             </motion.div>

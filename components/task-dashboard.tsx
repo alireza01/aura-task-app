@@ -1,4 +1,4 @@
- "use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -9,7 +9,7 @@ import AddTaskModal from "@/components/add-task-modal"
 import EditTaskModal from "@/components/edit-task-modal"
 import SignInPromptModal from "@/components/signin-prompt-modal"
 import ApiKeySetup from "@/components/api-key-setup"
-import SettingsModal from "@/components/settings-modal"
+import SettingsPanel from "@/components/settings/settings-panel"
 import TagsModal from "@/components/tags-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -93,54 +93,90 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         setGroups(newGroups)
         // TODO: Persist group order to Supabase if needed
       }
-    } else if (active.data.current?.type === "task" && active.id !== over.id) {
-      // Reorder tasks within a group or move to a different group
-      const taskId = active.id as string
-      const currentTask = tasks.find((t) => t.id === taskId)
-      if (!currentTask) return
+    } else if (active.data.current?.type === "task") {
+      const taskId = active.id as string;
+      const overId = over.id as string;
+      const currentTask = tasks.find((t) => t.id === taskId);
+      const overTask = tasks.find((t) => t.id === overId);
 
-      let newGroupId: string | null = currentTask.group_id || null
-      let newOrderIndex: number = currentTask.order_index
+      if (!currentTask || !overTask) return;
 
+      const oldGroupId = currentTask.group_id;
+      let newGroupId: string | null = overTask.group_id || null;
+
+      // Determine if dropping onto a group bubble
       if (over.data.current?.type === "group-container") {
-        // Dropped onto a group bubble
-        newGroupId = over.id as string
-        // When moving to a new group, place it at the end for now
-        newOrderIndex = tasks.filter(t => t.group_id === newGroupId).length
-      } else if (over.data.current?.type === "task") {
-        // Dropped onto another task
-        const overTask = tasks.find((t) => t.id === over.id)
-        if (overTask) {
-          newGroupId = overTask.group_id || null
-          const siblings = tasks.filter(t => t.group_id === newGroupId && t.id !== taskId).sort((a, b) => a.order_index - b.order_index)
-          const overIndex = siblings.findIndex(t => t.id === over.id)
-          
-          // Determine new order index based on where it was dropped relative to overTask
-          // This is a simplified reordering. A more robust solution would involve
-          // calculating precise new order_index values to avoid frequent updates.
-          // For now, we'll just place it before or after the overTask.
-          if (overIndex !== -1) {
-            newOrderIndex = overTask.order_index
-            // If dropping after, increment index
-            if (active.rect.translated && active.rect.translated.top > over.rect.top) {
-               newOrderIndex += 1;
-            }
-          }
-        }
+        newGroupId = over.id as string;
       }
 
-      // Update task in Supabase
-      try {
-        const { error } = await supabase
-          .from("tasks")
-          .update({ group_id: newGroupId, order_index: newOrderIndex })
-          .eq("id", taskId)
-        if (error) throw error
-        await loadTasks() // Re-fetch tasks to get updated order and group
-        toast({ title: "وظیفه به‌روزرسانی شد", description: "وظیفه با موفقیت جابجا شد." })
-      } catch (error) {
-        console.error("Error updating task group/order:", error)
-        toast({ title: "خطا در جابجایی وظیفه", description: "مشکلی در جابجایی وظیفه رخ داد.", variant: "destructive" })
+      // Case 1: Reordering within the same group
+      if (oldGroupId === newGroupId) {
+        const tasksInGroup = tasks
+          .filter((t) => t.group_id === oldGroupId)
+          .sort((a, b) => a.order_index - b.order_index);
+
+        const oldIndex = tasksInGroup.findIndex((t) => t.id === taskId);
+        const newIndex = tasksInGroup.findIndex((t) => t.id === overId);
+
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          const reorderedTasks = arrayMove(tasksInGroup, oldIndex, newIndex);
+
+          // Update order_index for all affected tasks in Supabase
+          const updates = reorderedTasks.map((task, index) => ({
+            id: task.id,
+            order_index: index,
+          }));
+
+          try {
+            // Optimistic update
+            setTasks((prev) => {
+              const updatedPrev = [...prev];
+              updates.forEach(update => {
+                const taskIndex = updatedPrev.findIndex(t => t.id === update.id);
+                if (taskIndex !== -1) {
+                  updatedPrev[taskIndex] = { ...updatedPrev[taskIndex], order_index: update.order_index };
+                }
+              });
+              return updatedPrev;
+            });
+
+            const { error } = await supabase.from("tasks").upsert(updates);
+            if (error) throw error;
+            toast({ title: "وظیفه به‌روزرسانی شد", description: "ترتیب وظایف با موفقیت به‌روزرسانی شد." });
+            await loadTasks(); // Re-fetch to ensure consistency
+          } catch (error) {
+            console.error("Error reordering tasks:", error);
+            toast({ title: "خطا در جابجایی وظیفه", description: "مشکلی در جابجایی وظیفه رخ داد.", variant: "destructive" });
+            await loadTasks(); // Revert by re-fetching
+          }
+        }
+      } else {
+        // Case 2: Moving to a different group (or from ungrouped to grouped, or vice versa)
+        // This logic is for moving tasks between groups/ungrouped.
+        // When moving to a new group, place it at the end of that group.
+        const tasksInNewGroup = tasks.filter(t => t.group_id === newGroupId && t.id !== taskId);
+        const newOrderIndex = tasksInNewGroup.length; // Place at the end
+
+        try {
+          // Optimistic update
+          setTasks((prev) =>
+            prev.map((task) =>
+              task.id === taskId ? { ...task, group_id: newGroupId, order_index: newOrderIndex } : task
+            )
+          );
+
+          const { error } = await supabase
+            .from("tasks")
+            .update({ group_id: newGroupId, order_index: newOrderIndex })
+            .eq("id", taskId);
+          if (error) throw error;
+          toast({ title: "وظیفه به‌روزرسانی شد", description: "وظیفه با موفقیت به گروه جدید منتقل شد." });
+          await loadTasks(); // Re-fetch to ensure consistency
+        } catch (error) {
+          console.error("Error updating task group:", error);
+          toast({ title: "خطا در انتقال وظیفه", description: "مشکلی در انتقال وظیفه به گروه جدید رخ داد.", variant: "destructive" });
+          await loadTasks(); // Revert by re-fetching
+        }
       }
     }
 
@@ -855,10 +891,11 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         <ApiKeySetup onComplete={() => setShowApiKeySetup(false)} onSkip={() => setShowApiKeySetup(false)} />
       )}
 
-      {showSettings && user && (
-        <SettingsModal
-          user={user}
+      {showSettings && (
+        <SettingsPanel
+          user={user || guestUser}
           settings={settings}
+          isOpen={showSettings}
           onClose={() => setShowSettings(false)}
           onSettingsChange={handleSettingsChange}
         />

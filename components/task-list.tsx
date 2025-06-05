@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Archive, RotateCcw, ChevronDown, ChevronUp } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { DraggableTaskCard } from './draggable-task-card';
 
 interface TaskListProps {
   tasks: Task[]
@@ -102,37 +104,39 @@ export default function TaskList({
         {isExpanded && (
           <CardContent>
             <AnimatePresence mode="popLayout">
-              <div className="space-y-3">
-                {groupTasks.map((task) => (
-                  <motion.div
-                    key={task.id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100, transition: { duration: 0.3 } }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <TaskCard
-                      task={task}
-                      onComplete={onComplete} // Use onComplete prop
-                      onUpdate={onTasksChange}
-                      onEdit={onEditTask}
-                      onDelete={onDeleteTask}
-                    />
-                  </motion.div>
-                ))}
+              <SortableContext items={groupTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-3">
+                  {groupTasks.map((task) => (
+                    <motion.div
+                      key={task.id}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -100, transition: { duration: 0.3 } }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <DraggableTaskCard
+                        task={task}
+                        onComplete={onComplete} // Use onComplete prop
+                        onUpdate={onTasksChange}
+                        onEdit={onEditTask}
+                        onDelete={onDeleteTask}
+                      />
+                    </motion.div>
+                  ))}
 
-                {groupTasks.length === 0 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="text-center py-8 text-gray-500"
-                  >
-                    <p className="text-sm">هیچ وظیفه‌ای در این گروه وجود ندارد</p>
-                  </motion.div>
-                )}
-              </div>
+                  {groupTasks.length === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-center py-8 text-gray-500"
+                    >
+                      <p className="text-sm">هیچ وظیفه‌ای در این گروه وجود ندارد</p>
+                    </motion.div>
+                  )}
+                </div>
+              </SortableContext>
             </AnimatePresence>
           </CardContent>
         )}
@@ -153,27 +157,29 @@ export default function TaskList({
           </CardHeader>
           <CardContent>
             <AnimatePresence mode="popLayout">
-              <div className="space-y-3">
-                {ungroupedTasks.map((task) => (
-                  <motion.div
-                    key={task.id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100, transition: { duration: 0.3 } }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <TaskCard
+              <SortableContext items={ungroupedTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-3">
+                  {ungroupedTasks.map((task) => (
+                    <motion.div
                       key={task.id}
-                      task={task}
-                      onComplete={onComplete} // Use onComplete prop
-                      onUpdate={onTasksChange}
-                      onEdit={onEditTask}
-                      onDelete={onDeleteTask}
-                    />
-                  </motion.div>
-                ))}
-              </div>
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -100, transition: { duration: 0.3 } }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <DraggableTaskCard
+                        key={task.id}
+                        task={task}
+                        onComplete={onComplete} // Use onComplete prop
+                        onUpdate={onTasksChange}
+                        onEdit={onEditTask}
+                        onDelete={onDeleteTask}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </SortableContext>
             </AnimatePresence>
           </CardContent>
         </Card>
