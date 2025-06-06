@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Edit3, Trash2, FolderOpen } from "lucide-react"
 import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
 import GroupFormModal from "./group-form-modal"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
@@ -37,15 +37,15 @@ export default function GroupContextMenu({
   const [loading, setLoading] = useState(false)
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
-  const { toast } = useToast()
+  const showToast = toast
   const supabase = createClientComponentClient()
 
   const handleDeleteGroup = async () => {
     if (taskCount > 0) {
-      toast({
-        title: "امکان حذف گروه وجود ندارد",
+      showToast("امکان حذف گروه وجود ندارد", {
         description: "ابتدا تمام وظایف این گروه را حذف یا به گروه دیگری منتقل کنید.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
       return
     }
@@ -64,18 +64,17 @@ export default function GroupContextMenu({
         setLocalGroups(updatedGroups)
       }
 
-      toast({
-        title: "گروه حذف شد",
+      showToast("گروه حذف شد", {
         description: `گروه "${group.name}" با موفقیت حذف شد.`,
       })
 
       onGroupsChange()
     } catch (error) {
       console.error("خطا در حذف گروه:", error)
-      toast({
-        title: "خطا در حذف گروه",
+      showToast("خطا در حذف گروه", {
         description: "مشکلی در حذف گروه رخ داد.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     } finally {
       setLoading(false)

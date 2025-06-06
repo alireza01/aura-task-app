@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { UserIcon, LogOut, Trash2 } from "lucide-react"
 
@@ -29,7 +29,6 @@ export default function AccountActions({ user }: AccountActionsProps) {
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   const handleSignOut = async () => {
     setLoading(true)

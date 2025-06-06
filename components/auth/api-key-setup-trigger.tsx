@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import ApiKeySetupModal from "./api-key-setup-modal"
 
@@ -13,7 +13,6 @@ interface ApiKeySetupTriggerProps {
 export default function ApiKeySetupTrigger({ user, onApiKeySet }: ApiKeySetupTriggerProps) {
   const [showModal, setShowModal] = useState(false)
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
     checkApiKeyStatus()

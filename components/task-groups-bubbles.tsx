@@ -3,14 +3,14 @@
 import type React from "react"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import type { TaskGroup, User, GuestUser } from "@/types"
 import { Plus } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { useTheme } from "@/components/theme/theme-provider"
 import GroupFormModal from "./groups/group-form-modal"
 import GroupContextMenu from "./groups/group-context-menu"
@@ -40,9 +40,8 @@ export default function TaskGroupsBubbles({
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null)
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
-  const { toast } = useToast()
+  const showToast = toast
   const { theme } = useTheme()
-  const supabase = createClientComponentClient()
 
   const handleDragOver = (e: React.DragEvent, groupId: string) => {
     e.preventDefault()
@@ -73,16 +72,15 @@ export default function TaskGroupsBubbles({
       }
 
       onGroupsChange()
-      toast({
-        title: "گروه حذف شد",
+      showToast("گروه حذف شد", {
         description: "گروه با موفقیت حذف شد.",
       })
     } catch (error) {
       console.error("خطا در حذف گروه:", error)
-      toast({
-        title: "خطا در حذف گروه",
+      showToast("خطا در حذف گروه", {
         description: "مشکلی در حذف گروه رخ داد.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     }
   }
@@ -179,8 +177,10 @@ export default function TaskGroupsBubbles({
 
               {theme !== "neda" && (
                 <GroupContextMenu
-                  groupId={group.id}
-                  groupName={group.name}
+                  group={group}
+                  user={user}
+                  guestUser={guestUser}
+                  settings={null}
                   taskCount={getTaskCountForGroup(group.id)}
                   onGroupsChange={onGroupsChange}
                 />
@@ -192,11 +192,12 @@ export default function TaskGroupsBubbles({
 
       {/* Create Group Modal */}
       <GroupFormModal
-        open={showCreateModal}
-        onOpenChange={setShowCreateModal}
-        onGroupsChange={onGroupsChange}
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onGroupSaved={onGroupsChange}
         user={user}
         guestUser={guestUser}
+        settings={null}
       />
     </div>
   )

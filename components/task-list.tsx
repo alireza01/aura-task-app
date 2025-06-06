@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { TaskCard } from "@/components/task-card"
 import type { Task, TaskGroup as TaskGroupType, UserSettings, User } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,7 +36,6 @@ export default function TaskList({
 }: TaskListProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(groups.map((g) => g.id)))
   const [showArchive, setShowArchive] = useState(false)
-  const supabase = createClientComponentClient()
 
   const activeTasks = tasks.filter((task) => !task.completed)
   const completedTasks = tasks.filter((task) => task.completed)

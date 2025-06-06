@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import type { GuestUser, TaskGroup, Tag, UserSettings, User, Task } from "@/types/index"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
@@ -33,7 +33,6 @@ export default function AddTaskModal({
 }: AddTaskModalProps) {
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
-  const supabase = createClientComponentClient()
   const { toast } = useToast()
 
   const handleSaveTask = async (formData: any) => {

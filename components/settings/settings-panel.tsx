@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 
@@ -29,7 +29,6 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   // Reset state when panel opens
   useEffect(() => {
@@ -110,11 +109,9 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
                 </TabsList>
 
                 <TabsContent value="ai" className="space-y-6 py-4">
+                  <ApiKeyManager user={user} settings={settings} onSettingsChange={handleSettingsChange} />
                   {user && !("isGuest" in user) && (
-                    <>
-                      <ApiKeyManager user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
-                      <AiBehaviorCustomizer user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
-                    </>
+                    <AiBehaviorCustomizer user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
                   )}
                 </TabsContent>
 

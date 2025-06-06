@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Plus, Edit3 } from "lucide-react"
-import type { Task, TaskGroup, UserSettings, User, GuestUser } from "@/types"
+import type { Task, TaskGroup, UserSettings, User, GuestUser, Tag } from "@/types"
+import type { TaskFormData } from "@/types"
 import TaskForm from "@/components/tasks/task-form"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
@@ -15,6 +16,7 @@ interface TaskFormModalProps {
   user: User | null
   guestUser: GuestUser | null
   groups: TaskGroup[]
+  tags: Tag[]
   settings: UserSettings | null
   isOpen: boolean
   onClose: () => void
@@ -27,6 +29,7 @@ export default function TaskFormModal({
   user,
   guestUser,
   groups,
+  tags,
   settings,
   isOpen,
   onClose,
@@ -35,12 +38,11 @@ export default function TaskFormModal({
   initialTitle = "",
 }: TaskFormModalProps) {
   const [loading, setLoading] = useState(false)
-  const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
-  const { toast } = useToast()
-  const supabase = createClientComponentClient()
+  const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
+  const showToast = toast
 
   const isEditMode = !!taskToEdit
-  const modalTitle = isEditMode ? `ویرایش وظیفه: ${taskToEdit.title}` : "ایجاد وظیفه جدید"
+  const modalTitle = isEditMode ? `ویرایش وظیفه: ${taskToEdit?.title}` : "ایجاد وظیفه جدید"
 
   // Handle escape key to close modal
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function TaskFormModal({
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isOpen, onClose])
 
-  const handleSaveTask = async (taskData: any) => {
+  const handleSaveTask = async (taskData: TaskFormData & { selectedTags: string[] }) => {
     setLoading(true)
 
     try {
@@ -100,8 +102,7 @@ export default function TaskFormModal({
             await supabase.from("subtasks").insert(subtaskInserts)
           }
 
-          toast({
-            title: "وظیفه به‌روزرسانی شد",
+          showToast("وظیفه به‌روزرسانی شد", {
             description: "تغییرات با موفقیت ذخیره شد.",
           })
         } else {
@@ -134,20 +135,19 @@ export default function TaskFormModal({
             await supabase.from("subtasks").insert(subtaskInserts)
           }
 
-          toast({
-            title: "وظیفه ایجاد شد",
+          showToast("وظیفه ایجاد شد", {
             description: "وظیفه جدید با موفقیت ایجاد شد.",
           })
         }
       } else {
         // Save to local storage
         if (isEditMode) {
-          const updatedTasks = localTasks.map((task) =>
+          const updatedTasks = localTasks.map((task: Task) =>
             task.id === taskToEdit!.id
-              ? {
+              ? ({
                   ...task,
                   title: taskData.title,
-                  description: taskData.description || null,
+                  description: taskData.description || undefined,
                   group_id: taskData.groupId || null,
                   speed_score: taskData.speedScore,
                   importance_score: taskData.importanceScore,
@@ -162,21 +162,21 @@ export default function TaskFormModal({
                       order_index: index,
                       created_at: new Date().toISOString(),
                     })) || [],
-                }
+                  tags: tags.filter((tag) => taskData.selectedTags.includes(tag.id)),
+                } as Task)
               : task,
           )
           setLocalTasks(updatedTasks)
 
-          toast({
-            title: "وظیفه به‌روزرسانی شد",
+          showToast("وظیفه به‌روزرسانی شد", {
             description: "تغییرات در حافظه محلی ذخیره شد.",
           })
         } else {
-          const newTask = {
+          const newTask: Task = {
             id: Date.now().toString(),
             user_id: guestUser?.id || "guest",
             title: taskData.title,
-            description: taskData.description || null,
+            description: taskData.description || undefined,
             group_id: taskData.groupId || null,
             speed_score: taskData.speedScore,
             importance_score: taskData.importanceScore,
@@ -194,12 +194,12 @@ export default function TaskFormModal({
                 order_index: index,
                 created_at: new Date().toISOString(),
               })) || [],
+            tags: tags.filter((tag) => taskData.selectedTags.includes(tag.id)),
           }
 
           setLocalTasks([...localTasks, newTask])
 
-          toast({
-            title: "وظیفه ایجاد شد",
+          showToast("وظیفه ایجاد شد", {
             description: "وظیفه جدید در حافظه محلی ذخیره شد.",
           })
         }
@@ -209,10 +209,10 @@ export default function TaskFormModal({
       onClose()
     } catch (error) {
       console.error("خطا در ذخیره وظیفه:", error)
-      toast({
-        title: "خطا در ذخیره وظیفه",
+      showToast("خطا در ذخیره وظیفه", {
         description: "مشکلی در ذخیره وظیفه رخ داد. لطفاً دوباره تلاش کنید.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     } finally {
       setLoading(false)
@@ -251,12 +251,14 @@ export default function TaskFormModal({
                 user={user}
                 guestUser={guestUser}
                 groups={groups}
+                tags={tags}
                 settings={settings}
                 taskToEdit={taskToEdit}
                 initialTitle={initialTitle}
                 loading={loading}
                 onSave={handleSaveTask}
                 onCancel={onClose}
+                isEditMode={isEditMode}
               />
             </motion.div>
           </DialogContent>

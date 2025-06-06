@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // Get user's API key
     const { data: settings } = await supabase
       .from("user_settings")
-      .select("gemini_api_key")
+      .select("gemini_api_key, speed_weight, importance_weight")
       .eq("user_id", userId)
       .single()
 
@@ -31,8 +31,10 @@ export async function POST(request: NextRequest) {
     prompt += "\n\nلطفاً پاسخ را به صورت JSON با فرمت زیر ارائه دهید:\n{"
 
     if (autoRanking) {
-      prompt += '\n  "speedScore": عدد بین 1 تا 20 (سرعت انجام - 20 = خیلی سریع، 1 = خیلی کند),'
-      prompt += '\n  "importanceScore": عدد بین 1 تا 20 (اهمیت - 20 = بحرانی، 1 = کم اهمیت),'
+      const speedWeight = settings?.speed_weight ?? 50
+      const importanceWeight = settings?.importance_weight ?? 50
+      prompt += `\n  "speedScore": عدد بین 1 تا 20 (سرعت انجام - 20 = خیلی سریع، 1 = خیلی کند، با وزن ${speedWeight}%),`
+      prompt += `\n  "importanceScore": عدد بین 1 تا 20 (اهمیت - 20 = بحرانی، 1 = کم اهمیت، با وزن ${importanceWeight}%),`
     }
 
     prompt += '\n  "emoji": "یک ایموجی مناسب برای این وظیفه"'

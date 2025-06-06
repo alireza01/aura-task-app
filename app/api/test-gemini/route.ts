@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
+  // This route is intended for development testing of the Gemini API key.
+  // It should not be accessible in a production environment.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
   try {
     const { apiKey } = await request.json()
 

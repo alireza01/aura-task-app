@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Palette, Moon, Sun, Sparkles } from "lucide-react"
 import type { UserSettings, GuestUser } from "@/types"
@@ -25,7 +25,6 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
   const [loading, setLoading] = useState(false)
   const debouncedTheme = useDebounce(selectedTheme, 500)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
     if (settings) {
@@ -45,18 +44,28 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
         setTheme(debouncedTheme as any)
 
         if (user && !("isGuest" in user)) { // Only save to Supabase if it's an authenticated user
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          console.log("Auth UID from Supabase:", authUser?.id);
+          console.log("Attempting to save theme to Supabase with payload:", {
+            user_id: user.id,
+            theme: debouncedTheme,
+            updated_at: new Date().toISOString(),
+          });
           const { error } = await supabase.from("user_settings").upsert({
             user_id: user.id,
             theme: debouncedTheme,
             updated_at: new Date().toISOString(),
-          })
+          }, { onConflict: 'user_id' });
 
-          if (error) throw error
+          if (error) {
+            console.error("Supabase upsert error object:", error)
+            throw error
+          }
         }
 
         onSettingsChange()
       } catch (error) {
-        console.error("خطا در ذخیره تم:", error)
+        console.error("خطا در ذخیره تم:", JSON.stringify(error, null, 2))
         toast({
           title: "خطا در ذخیره تم",
           description: "مشکلی در ذخیره تم رخ داد. لطفاً دوباره تلاش کنید.",

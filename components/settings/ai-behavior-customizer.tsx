@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Sparkles, RotateCcw, Clock, Star } from "lucide-react"
 import type { UserSettings } from "@/types"
@@ -31,7 +31,6 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
   const debouncedAutoRanking = useDebounce(autoRanking, 500)
   const debouncedAutoSubtasks = useDebounce(autoSubtasks, 500)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
     if (settings) {

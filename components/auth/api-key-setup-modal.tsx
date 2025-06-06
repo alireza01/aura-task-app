@@ -3,13 +3,13 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   X,
@@ -40,7 +40,6 @@ export default function ApiKeySetupModal({ user, isOpen, onClose, onApiKeySet }:
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   // Reset state when modal opens
   useEffect(() => {

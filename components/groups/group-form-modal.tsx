@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, FolderPlus, Edit3, Sparkles } from "lucide-react"
 import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
@@ -44,7 +44,7 @@ export default function GroupFormModal({
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
-  const { toast } = useToast()
+  const showToast = toast
   const supabase = createClientComponentClient()
 
   const isEditMode = !!groupToEdit
@@ -162,8 +162,7 @@ export default function GroupFormModal({
             await assignAiEmoji(groupName, groupToEdit!.id)
           }
 
-          toast({
-            title: "گروه به‌روزرسانی شد",
+          showToast.success("گروه به‌روزرسانی شد", {
             description: `گروه "${groupName}" با موفقیت به‌روزرسانی شد.`,
           })
         } else {
@@ -183,8 +182,7 @@ export default function GroupFormModal({
           // Assign AI emoji after creation
           const aiEmoji = await assignAiEmoji(groupName, newGroup.id)
 
-          toast({
-            title: "گروه ایجاد شد",
+          showToast.success("گروه ایجاد شد", {
             description: `گروه "${groupName}" با موفقیت ایجاد شد.`,
           })
         }
@@ -207,8 +205,7 @@ export default function GroupFormModal({
             await assignAiEmoji(groupName, groupToEdit!.id)
           }
 
-          toast({
-            title: "گروه به‌روزرسانی شد",
+          showToast.success("گروه به‌روزرسانی شد", {
             description: `گروه "${groupName}" در حافظه محلی به‌روزرسانی شد.`,
           })
         } else {
@@ -226,8 +223,7 @@ export default function GroupFormModal({
           // Assign AI emoji after creation
           await assignAiEmoji(groupName, newGroup.id)
 
-          toast({
-            title: "گروه ایجاد شد",
+          showToast.success("گروه ایجاد شد", {
             description: `گروه "${groupName}" در حافظه محلی ایجاد شد.`,
           })
         }
@@ -238,10 +234,8 @@ export default function GroupFormModal({
       reset()
     } catch (error) {
       console.error("خطا در ذخیره گروه:", error)
-      toast({
-        title: "خطا در ذخیره گروه",
+      showToast.error("خطا در ذخیره گروه", {
         description: "مشکلی در ذخیره گروه رخ داد. لطفاً دوباره تلاش کنید.",
-        variant: "destructive",
       })
     } finally {
       setLoading(false)

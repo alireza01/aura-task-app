@@ -9,16 +9,35 @@ import type { Task, TaskGroup as TaskGroupType } from "@/types"
 import { ChevronDown, ChevronUp } from "lucide-react"
 
 interface TaskGroupProps {
+  /** The task group object containing id, name, and emoji. */
   group: TaskGroupType
+  /** An array of tasks belonging to this group. */
   tasks: Task[]
+  /** Whether the task group is currently expanded to show tasks. */
   expanded: boolean
+  /** Callback function to toggle the expanded state of the group. */
   onToggle: () => void
+  /**
+   * Callback function to handle task completion status changes.
+   * @param taskId The ID of the task to update.
+   * @param completed The new completion status of the task.
+   */
   onTaskComplete: (taskId: string, completed: boolean) => Promise<void>
+  /** Callback function to trigger a refresh of tasks, typically after an update. */
   onTasksChange: () => void
 }
 
+/**
+ * TaskGroup component displays a collapsible group of tasks.
+ * It shows group details, task count, completion progress, and a list of draggable tasks.
+ *
+ * @param {TaskGroupProps} props - The properties for the TaskGroup component.
+ * @returns {JSX.Element} A Card component representing the task group.
+ */
 export default function TaskGroup({ group, tasks, expanded, onToggle, onTaskComplete, onTasksChange }: TaskGroupProps) {
+  // Calculate the number of completed tasks within the group
   const completedTasks = tasks.filter((task) => task.completed).length
+  // Get the total number of tasks in the group
   const totalTasks = tasks.length
 
   return (

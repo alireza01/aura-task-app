@@ -92,3 +92,15 @@ export interface GuestUser {
   email: string
   created_at: string
 }
+
+export interface TaskFormData {
+  title: string
+  description?: string
+  groupId?: string
+  autoRanking: boolean
+  autoSubtasks: boolean
+  speedScore: number
+  importanceScore: number
+  emoji?: string
+  subtasks?: string[]
+}

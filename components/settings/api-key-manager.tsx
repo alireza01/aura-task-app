@@ -3,14 +3,14 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Key, Eye, EyeOff, ExternalLink, AlertCircle, CheckCircle } from "lucide-react"
 import type { UserSettings } from "@/types"
@@ -28,7 +28,6 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
     if (settings?.gemini_api_key) {

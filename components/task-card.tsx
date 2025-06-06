@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,7 +29,6 @@ interface TaskCardProps {
 export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskCardProps) {
   const [showSubtasks, setShowSubtasks] = useState(false)
   const [completingSubtask, setCompletingSubtask] = useState<string | null>(null)
-  const supabase = createClientComponentClient()
 
   const handleCompleteTask = async (checked: boolean) => {
     await onComplete(task.id, checked)
@@ -96,10 +95,10 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
                         <motion.h3
                           className={cn(
                             "font-medium text-foreground hover:text-primary transition-colors cursor-pointer relative",
+                            task.completed && "line-through-animated",
                           )}
                           onClick={() => onEdit && onEdit(task)}
                           animate={{
-                            textDecoration: task.completed ? "line-through" : "none",
                             opacity: task.completed ? 0.7 : 1,
                           }}
                           transition={{ duration: 0.3 }}
@@ -110,9 +109,11 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
 
                       {task.description && (
                         <motion.p
-                          className={cn("text-sm text-muted-foreground mb-3 leading-relaxed")}
+                          className={cn(
+                            "text-sm text-muted-foreground mb-3 leading-relaxed",
+                            task.completed && "line-through-animated",
+                          )}
                           animate={{
-                            textDecoration: task.completed ? "line-through" : "none",
                             opacity: task.completed ? 0.7 : 1,
                           }}
                           transition={{ duration: 0.3 }}
@@ -226,9 +227,8 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
                     className="h-4 w-4 rounded-sm"
                   />
                   <motion.span
-                    className={cn("text-sm flex-1")}
+                    className={cn("text-sm flex-1 relative", subtask.completed && "line-through-animated")}
                     animate={{
-                      textDecoration: subtask.completed ? "line-through" : "none",
                       opacity: subtask.completed ? 0.7 : 1,
                     }}
                     transition={{ duration: 0.3 }}

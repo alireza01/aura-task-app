@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,11 +9,10 @@ import type { Task, User, GuestUser } from "@/types"
 import { Archive, RotateCcw, Trash2, Calendar, Clock } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ArchiveViewProps {
   user: User | null
-  guestUser: GuestUser | null
   archivedTasks: Task[]
   onTasksChange: () => void
   isVisible: boolean
@@ -22,16 +21,14 @@ interface ArchiveViewProps {
 
 export default function ArchiveView({
   user,
-  guestUser,
   archivedTasks,
   onTasksChange,
   isVisible,
   onToggle,
 }: ArchiveViewProps) {
-  const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
+  const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const [loading, setLoading] = useState<string | null>(null)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   const handleUnarchive = async (taskId: string) => {
     setLoading(taskId)

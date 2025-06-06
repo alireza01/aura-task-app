@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Task, TaskGroup, UserSettings, Tag, User, GuestUser } from "@/types"
 import { Edit3 } from "lucide-react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import TaskForm from "@/components/tasks/task-form"
 
 interface EditTaskModalProps {
@@ -31,9 +31,8 @@ export default function EditTaskModal({
   onTaskUpdated,
 }: EditTaskModalProps) {
   const [loading, setLoading] = useState(false)
-  const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
-  const { toast } = useToast()
-  const supabase = createClientComponentClient()
+  const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
+  const showToast = toast
 
   const handleSaveTask = async (formData: any) => {
     setLoading(true)
@@ -101,8 +100,7 @@ export default function EditTaskModal({
         setLocalTasks(updatedTasks)
       }
 
-      toast({
-        title: "وظیفه به‌روزرسانی شد",
+      showToast("وظیفه به‌روزرسانی شد", {
         description: "تغییرات با موفقیت ذخیره شد.",
       })
 
@@ -110,10 +108,10 @@ export default function EditTaskModal({
       onClose()
     } catch (error) {
       console.error("خطا در به‌روزرسانی وظیفه:", error)
-      toast({
-        title: "خطا در به‌روزرسانی",
+      showToast("خطا در به‌روزرسانی", {
         description: "مشکلی در ذخیره تغییرات رخ داد.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     } finally {
       setLoading(false)

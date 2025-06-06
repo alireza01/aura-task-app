@@ -1,30 +1,70 @@
-# To-do list app
+# AuraTask: Advanced Task Management Application
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+AuraTask is a modern, feature-rich task management application designed to help users organize their tasks, collaborate within groups, and leverage AI for enhanced productivity. Built with Next.js, React, and Supabase, AuraTask offers a seamless and intuitive user experience with real-time updates and customizable themes.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/alirezamozi01-gmailcoms-projects/v0-to-do-list-app)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/Lh9gYY8lXXb)
+## Features
 
-## Overview
+*   **Comprehensive Task Management:** Create, edit, delete, and mark tasks as complete. Organize tasks with due dates, priorities, and tags.
+*   **Group Organization:** Create and manage task groups, assign tasks to specific groups, and collaborate with others.
+*   **AI Integration:** Leverage AI capabilities for task processing, intelligent suggestions, and automated group emoji assignments.
+*   **Custom Themes:** Personalize your experience with a variety of custom themes, including "Alireza" and "Neda," featuring unique visual effects like glassmorphism and bubbly animations.
+*   **Real-time Updates:** Enjoy a dynamic experience with real-time synchronization of tasks and groups, powered by Supabase Realtime.
+*   **Subtasks:** Break down complex tasks into smaller, manageable subtasks for better organization.
+*   **User Authentication:** Securely manage your tasks with user authentication powered by Supabase Auth.
+*   **Responsive Design:** A beautiful and functional interface across all devices.
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## Setup
 
-## Deployment
+To get AuraTask up and running on your local machine, follow these steps:
 
-Your project is live at:
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-repo/auratask.git
+    cd auratask
+    ```
+2.  **Install dependencies:**
+    AuraTask uses `pnpm` as its package manager. If you don't have `pnpm` installed, you can install it via npm:
+    ```bash
+    npm install -g pnpm
+    ```
+    Then, install the project dependencies:
+    ```bash
+    pnpm install
+    ```
+3.  **Set up Environment Variables:**
+    Create a `.env.local` file in the root of your project and add the required environment variables as described in the "Environment Variables" section below.
+4.  **Run the development server:**
+    ```bash
+    pnpm dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-**[https://vercel.com/alirezamozi01-gmailcoms-projects/v0-to-do-list-app](https://vercel.com/alirezamozi01-gmailcoms-projects/v0-to-do-list-app)**
+## Environment Variables
 
-## Build your app
+AuraTask requires the following environment variables to function correctly. Create a `.env.local` file in the root of your project and populate it with your values:
 
-Continue building your app on:
+*   `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
+*   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase project's public anon key.
+*   `GEMINI_API_KEY`: Your Google Gemini API key for AI integration.
 
-**[https://v0.dev/chat/projects/Lh9gYY8lXXb](https://v0.dev/chat/projects/Lh9gYY8lXXb)**
+**Example .env.local:**
 
-## How It Works
+```
+NEXT_PUBLIC_SUPABASE_URL="https://your-project-id.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+GEMINI_API_KEY="your-gemini-api-key"
+```
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+## Database Setup (Supabase)
+
+AuraTask uses Supabase for its backend. You'll need to set up a Supabase project and configure your database schema.
+
+1.  **Create a Supabase Project:** Go to [Supabase](https://supabase.com/) and create a new project.
+2.  **Apply Schema:** You can find the database schema in [`supabase/schema.sql`](supabase/schema.sql). You can either:
+    *   Copy and paste the content of `schema.sql` into the SQL Editor in your Supabase project dashboard and run it.
+    *   Use the Supabase CLI to link your local project and push the schema.
+3.  **Configure Row Level Security (RLS):** Ensure RLS is enabled for all relevant tables and policies are set up to control data access based on user authentication. Refer to the Supabase documentation for detailed RLS setup.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Tag, User, GuestUser } from "@/types"
 import { TagIcon, Plus, Trash2, Edit3 } from "lucide-react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
@@ -39,8 +39,7 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [loading, setLoading] = useState(false)
   const [localTags, setLocalTags] = useLocalStorage<Tag[]>("aura-tags", [])
-  const { toast } = useToast()
-  const supabase = createClientComponentClient()
+  const showToast = toast
 
   const handleAddTag = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,16 +78,15 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
       setNewTagColor("blue")
       onTagsChange()
 
-      toast({
-        title: "برچسب اضافه شد",
+      showToast("برچسب اضافه شد", {
         description: `برچسب "${newTag.name}" با موفقیت ایجاد شد.`,
       })
     } catch (error) {
       console.error("خطا در ایجاد برچسب:", error)
-      toast({
-        title: "خطا در ایجاد برچسب",
+      showToast("خطا در ایجاد برچسب", {
         description: "مشکلی در ایجاد برچسب رخ داد.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     } finally {
       setLoading(false)
@@ -122,16 +120,15 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
       setEditingTag(null)
       onTagsChange()
 
-      toast({
-        title: "برچسب به‌روزرسانی شد",
+      showToast("برچسب به‌روزرسانی شد", {
         description: "تغییرات با موفقیت ذخیره شد.",
       })
     } catch (error) {
       console.error("خطا در به‌روزرسانی برچسب:", error)
-      toast({
-        title: "خطا در به‌روزرسانی",
+      showToast("خطا در به‌روزرسانی", {
         description: "مشکلی در ذخیره تغییرات رخ داد.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     } finally {
       setLoading(false)
@@ -152,16 +149,15 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
 
       onTagsChange()
 
-      toast({
-        title: "برچسب حذف شد",
+      showToast("برچسب حذف شد", {
         description: "برچسب با موفقیت حذف شد.",
       })
     } catch (error) {
       console.error("خطا در حذف برچسب:", error)
-      toast({
-        title: "خطا در حذف برچسب",
+      showToast("خطا در حذف برچسب", {
         description: "مشکلی در حذف برچسب رخ داد.",
-        variant: "destructive",
+        duration: 3000,
+        className: "bg-red-500 text-white",
       })
     } finally {
       setLoading(false)

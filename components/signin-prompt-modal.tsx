@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,7 +15,6 @@ interface SignInPromptModalProps {
 
 export default function SignInPromptModal({ onClose, onSignIn }: SignInPromptModalProps) {
   const [loading, setLoading] = useState(false)
-  const supabase = createClientComponentClient()
 
   const handleSignIn = async () => {
     setLoading(true)

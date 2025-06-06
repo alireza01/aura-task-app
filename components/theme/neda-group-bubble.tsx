@@ -34,7 +34,7 @@ export default function NedaGroupBubble({
 }: NedaGroupBubbleProps) {
   const [showDeleteEffect, setShowDeleteEffect] = useState(false)
   const [effectPosition, setEffectPosition] = useState({ x: 0, y: 0 })
-  const bubbleRef = useRef<HTMLButtonElement>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const bubble = bubbleRef.current
@@ -127,13 +127,15 @@ export default function NedaGroupBubble({
 
   return (
     <>
-      <motion.button
+      <motion.div
         ref={bubbleRef}
         onClick={onClick}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         whileTap={{ scale: 0.95 }}
+        role="button"
+        tabIndex={0}
         className={cn(
           "relative flex-shrink-0 px-6 py-4 rounded-3xl transition-all duration-300 min-w-[140px] group",
           "bg-gradient-to-br from-neda-accent-purple to-neda-accent-pink",
@@ -182,15 +184,23 @@ export default function NedaGroupBubble({
 
         {/* Delete button (appears on hover) */}
         {onDelete && (
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation()
               handleDelete()
             }}
-            className="absolute -top-2 -right-2 w-6 h-6 bg-neda-accent-pink rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-400"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation()
+                handleDelete()
+              }
+            }}
+            className="absolute -top-2 -right-2 w-6 h-6 bg-neda-accent-pink rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-400 cursor-pointer"
           >
             <span className="text-white text-xs">×</span>
-          </button>
+          </div>
         )}
 
         {/* Ripple effect on click */}
@@ -202,7 +212,7 @@ export default function NedaGroupBubble({
             transition={{ duration: 0.4 }}
           />
         </div>
-      </motion.button>
+      </motion.div>
 
       <BubbleEffects trigger={showDeleteEffect} type="pop" x={effectPosition.x} y={effectPosition.y} />
     </>

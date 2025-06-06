@@ -1,30 +1,31 @@
 "use client"
+import React from 'react';
 
-import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { User, Task, TaskGroup, UserSettings, Tag, GuestUser } from "@/types"
-import Header from "@/components/header"
-import TaskList from "@/components/task-list"
-import AddTaskModal from "@/components/add-task-modal"
-import EditTaskModal from "@/components/edit-task-modal"
-import SignInPromptModal from "@/components/signin-prompt-modal"
-import ApiKeySetup from "@/components/api-key-setup"
-import SettingsPanel from "@/components/settings/settings-panel"
-import TagsModal from "@/components/tags-modal"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useToast } from "@/hooks/use-toast"
-import { v4 as uuidv4 } from "uuid"
-import { Search, TagIcon, X, Filter, Calendar, Star, CheckCircle2, LayoutDashboard, Plus } from "lucide-react"
-import StatsDashboard from "@/components/stats-dashboard"
-import { motion, AnimatePresence } from "framer-motion"
-import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, UniqueIdentifier } from "@dnd-kit/core"
-import { SortableContext, verticalListSortingStrategy, arrayMove, useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers"
-import TaskGroupsBubbles from "@/components/task-groups-bubbles"
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import type { User, Task, TaskGroup, UserSettings, Tag, GuestUser } from '@/types'
+import Header from '@/components/header'
+import TaskList from '@/components/task-list'
+import AddTaskModal from '@/components/add-task-modal'
+import EditTaskModal from '@/components/edit-task-modal'
+import SignInPromptModal from '@/components/signin-prompt-modal'
+import ApiKeySetup from '@/components/api-key-setup'
+import SettingsPanel from '@/components/settings/settings-panel'
+import TagsModal from '@/components/tags-modal'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useLocalStorage } from '@/hooks/use-local-storage'
+import { useToast } from '@/components/ui/use-toast'
+import { v4 as uuidv4 } from 'uuid'
+import { Search, TagIcon, X, Filter, Calendar, Star, CheckCircle2, LayoutDashboard, Plus } from 'lucide-react'
+import StatsDashboard from '@/components/stats-dashboard'
+import { motion, AnimatePresence } from 'framer-motion'
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, UniqueIdentifier } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
+import TaskGroupsBubbles from '@/components/task-groups-bubbles'
 
 interface TaskDashboardProps {
   user: User | null
@@ -68,7 +69,6 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
   const [localGuestUser, setLocalGuestUser] = useLocalStorage<GuestUser | null>("aura-guest-user", null)
 
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
 
   // Drag and Drop Functionality
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))
@@ -204,78 +204,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
     }
   }, [user, localGuestUser, setLocalGuestUser])
 
-  // Load data based on user status
-  useEffect(() => {
-    if (user) {
-      loadUserData()
-      migrateLocalData()
-    } else {
-      // Load from local storage
-      setTasks(localTasks)
-      setGroups(localGroups)
-      setTags(localTags)
-      setLoading(false)
-    }
-  }, [user, localTasks, localGroups, localTags, supabase]) // Added supabase to dependency array
-
-  // Supabase Realtime Subscription
-  useEffect(() => {
-    if (!user) return
-
-    const tasksChannel = supabase
-      .channel("public:tasks")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setTasks((prevTasks) => [...prevTasks, payload.new as Task])
-          } else if (payload.eventType === "UPDATE") {
-            setTasks((prevTasks) =>
-              prevTasks.map((task) => (task.id === payload.old.id ? (payload.new as Task) : task)),
-            )
-          } else if (payload.eventType === "DELETE") {
-            setTasks((prevTasks) => prevTasks.filter((task) => task.id !== payload.old.id))
-          }
-        },
-      )
-      .subscribe()
-
-    const subtasksChannel = supabase
-      .channel("public:subtasks")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "subtasks" }, // Subtasks don't have user_id, need to filter by task_id later if needed
-        async (payload) => {
-          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
-            // Re-fetch tasks to ensure subtasks are updated correctly
-            // A more granular update could be implemented, but re-fetching is simpler for now
-            await loadTasks()
-          }
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(tasksChannel)
-      supabase.removeChannel(subtasksChannel)
-    }
-  }, [user, supabase])
-
-  // Apply filters whenever tasks or filter criteria change
-  useEffect(() => {
-    applyFilters()
-  }, [tasks, searchQuery, filterGroup, filterStatus, filterPriority, filterTag, activeTab])
-
-  const loadUserData = async () => {
-    if (!user) return
-
-    setLoading(true)
-    await Promise.all([loadTasks(), loadGroups(), loadTags(), loadSettings()])
-    setLoading(false)
-  }
-
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     if (!user) return
 
     const { data } = await supabase
@@ -289,25 +218,25 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
       .order("order_index")
 
     if (data) setTasks(data)
-  }
+  }, [user])
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     if (!user) return
 
     const { data } = await supabase.from("task_groups").select("*").eq("user_id", user.id).order("created_at")
 
     if (data) setGroups(data)
-  }
+  }, [user])
 
-  const loadTags = async () => {
+  const loadTags = useCallback(async () => {
     if (!user) return
 
     const { data } = await supabase.from("tags").select("*").eq("user_id", user.id).order("name")
 
     if (data) setTags(data)
-  }
+  }, [user])
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     if (!user) return
 
     const { data } = await supabase.from("user_settings").select("*").eq("user_id", user.id).single()
@@ -320,9 +249,17 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
     } else {
       setShowApiKeySetup(true)
     }
-  }
+  }, [user])
 
-  const migrateLocalData = async () => {
+  const loadUserData = useCallback(async () => {
+    if (!user) return
+
+    setLoading(true)
+    await Promise.all([loadTasks(), loadGroups(), loadTags(), loadSettings()])
+    setLoading(false)
+  }, [user, loadTasks, loadGroups, loadSettings])
+
+  const migrateLocalData = useCallback(async () => {
     if (!user || localTasks.length === 0) return
 
     try {
@@ -430,9 +367,67 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         variant: "destructive",
       })
     }
-  }
+  }, [user, localTasks, localGroups, localTags, toast, loadUserData])
 
-  const applyFilters = () => {
+  // Load data based on user status
+  useEffect(() => {
+    if (user) {
+      loadUserData()
+      migrateLocalData()
+    } else {
+      // Load from local storage
+      setTasks(localTasks)
+      setGroups(localGroups)
+      setTags(localTags)
+      setLoading(false)
+    }
+  }, [user, localTasks, localGroups, localTags, loadUserData, migrateLocalData])
+
+  // Supabase Realtime Subscription
+  useEffect(() => {
+    if (!user) return
+
+    const tasksChannel = supabase
+      .channel("public:tasks")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setTasks((prevTasks) => [...prevTasks, payload.new as Task])
+          } else if (payload.eventType === "UPDATE") {
+            setTasks((prevTasks) =>
+              prevTasks.map((task) => (task.id === payload.old.id ? (payload.new as Task) : task)),
+            )
+          } else if (payload.eventType === "DELETE") {
+            setTasks((prevTasks) => prevTasks.filter((task) => task.id !== payload.old.id))
+          }
+        },
+      )
+      .subscribe()
+
+    const subtasksChannel = supabase
+      .channel("public:subtasks")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "subtasks" }, // Subtasks don't have user_id, need to filter by task_id later if needed
+        async (payload) => {
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
+            // Re-fetch tasks to ensure subtasks are updated correctly
+            // A more granular update could be implemented, but re-fetching is simpler for now
+            await loadTasks()
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(tasksChannel)
+      supabase.removeChannel(subtasksChannel)
+    }
+  }, [user, loadTasks])
+
+  const applyFilters = useCallback(() => {
     let result = [...tasks]
 
     // Apply tab filter
@@ -490,23 +485,29 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
     }
 
     setFilteredTasks(result)
-  }
+  }, [tasks, searchQuery, filterGroup, filterStatus, filterPriority, filterTag, activeTab])
 
-  const handleAddTask = () => {
+  // Apply filters whenever tasks or filter criteria change
+  useEffect(() => {
+    applyFilters()
+  }, [applyFilters])
+
+
+  const handleAddTask = useCallback(() => {
     if (!user && !hasShownSignInPrompt && localTasks.length === 0) {
       setShowSignInPrompt(true)
       setHasShownSignInPrompt(true)
     } else {
       setShowAddTask(true)
     }
-  }
+  }, [user, hasShownSignInPrompt, localTasks.length, setHasShownSignInPrompt])
 
-  const handleEditTask = (task: Task) => {
+  const handleEditTask = useCallback((task: Task) => {
     setTaskToEdit(task)
     setShowEditTask(true)
-  }
+  }, [])
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = useCallback(async (taskId: string) => {
     // Optimistic update
     const originalTasks = tasks
     setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId))
@@ -534,9 +535,9 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         variant: "destructive",
       })
     }
-  }
+  }, [user, tasks, localTasks, setLocalTasks, toast])
 
-  const completeTask = async (taskId: string, completed: boolean) => {
+  const completeTask = useCallback(async (taskId: string, completed: boolean) => {
     // Optimistic update
     const originalTasks = tasks
     setTasks((prevTasks) =>
@@ -573,37 +574,72 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         variant: "destructive",
       })
     }
-  }
+  }, [user, tasks, localTasks, setLocalTasks, toast])
 
-  const handleTaskAdded = async () => {
+  const handleTaskAdded = useCallback(async () => {
     if (user) {
       await loadTasks() // Realtime will handle this, but keep for initial load consistency
     } else {
       setTasks([...localTasks])
     }
-  }
+  }, [user, loadTasks, localTasks])
 
-  const handleSettingsChange = () => {
+  const handleSettingsChange = useCallback(() => {
     if (user) {
       loadSettings()
     }
-  }
+  }, [user, loadSettings])
 
-  const handleTagsChange = () => {
+  const handleTagsChange = useCallback(() => {
     if (user) {
       loadTags()
     } else {
       setTags([...localTags])
     }
-  }
+  }, [user, loadTags, localTags])
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchQuery("")
     setFilterGroup(null)
     setFilterStatus("all")
     setFilterPriority("all")
     setFilterTag(null)
-  }
+  }, [])
+const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: string | null) => {
+    const originalTasks = tasks;
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId ? { ...task, group_id: newGroupId } : task
+      )
+    );
+
+    try {
+      if (user) {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ group_id: newGroupId })
+          .eq("id", taskId);
+        if (error) throw error;
+      } else {
+        const updatedTasks = localTasks.map((task) =>
+          task.id === taskId ? { ...task, group_id: newGroupId } : task
+        );
+        setLocalTasks(updatedTasks);
+      }
+      toast({
+        title: "وظیفه به‌روزرسانی شد",
+        description: "وظیفه با موفقیت به گروه جدید منتقل شد.",
+      });
+    } catch (error) {
+      console.error("Error updating task group:", error);
+      setTasks(originalTasks); // Revert on error
+      toast({
+        title: "خطا در انتقال وظیفه",
+        description: "مشکلی در انتقال وظیفه به گروه جدید رخ داد.",
+        variant: "destructive",
+      });
+    }
+  }, [user, tasks, localTasks, setLocalTasks, toast]);
 
   const hasActiveFilters = searchQuery || filterGroup || filterStatus !== "all" || filterPriority !== "all" || filterTag
 
@@ -913,67 +949,4 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
     </div>
   )
 
-  async function handleTaskDropToGroup(taskId: string, newGroupId: string | null) {
-   const originalTasks = tasks;
-   setTasks((prevTasks) =>
-     prevTasks.map((task) =>
-       task.id === taskId ? { ...task, group_id: newGroupId } : task
-     )
-   );
-
-   try {
-     if (user) {
-       const { error } = await supabase
-         .from("tasks")
-         .update({ group_id: newGroupId })
-         .eq("id", taskId);
-       if (error) throw error;
-     } else {
-       const updatedTasks = localTasks.map((task) =>
-         task.id === taskId ? { ...task, group_id: newGroupId } : task
-       );
-       setLocalTasks(updatedTasks);
-     }
-     toast({
-       title: "وظیفه به‌روزرسانی شد",
-       description: "وظیفه با موفقیت به گروه جدید منتقل شد.",
-     });
-   } catch (error) {
-     console.error("Error updating task group:", error);
-     setTasks(originalTasks); // Revert on error
-     toast({
-       title: "خطا در انتقال وظیفه",
-       description: "مشکلی در انتقال وظیفه به گروه جدید رخ داد.",
-       variant: "destructive",
-     });
-   }
- }
-}
-
-interface SortableItemProps {
-  id: string
-  group: TaskGroup
-}
-
-function SortableItem({ id, group }: SortableItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: id })
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  }
-
-  return (
-    <motion.div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-secondary rounded-full px-4 py-2 text-sm cursor-grab"
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
-    >
-      {group.emoji} {group.name}
-    </motion.div>
-  )
 }

@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabaseClient"
 import type { User } from "@/types"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,6 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const { theme, setTheme } = useTheme()
-  const supabase = createClientComponentClient()
 
   const handleSignIn = async () => {
     setLoading(true)
