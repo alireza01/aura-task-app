@@ -21,7 +21,6 @@ interface ThemeSelectorProps {
 
 export default function ThemeSelector({ user, settings, onSettingsChange }: ThemeSelectorProps) {
   const { theme, setTheme } = useTheme()
-  const { theme, setTheme } = useTheme()
   const [selectedTheme, setSelectedTheme] = useState<string>(theme)
   const [loading, setLoading] = useState(false)
   const debouncedTheme = useDebounce(selectedTheme, 500)
