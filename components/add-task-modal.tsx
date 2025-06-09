@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { GuestUser, TaskGroup, Tag, UserSettings, User, Task } from "@/types/index"
-import { supabase } from "@/lib/supabaseClient"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
@@ -34,11 +34,16 @@ export default function AddTaskModal({
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const { toast } = useToast()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const handleSaveTask = async (formData: any) => {
     setLoading(true)
     try {
-      if (user) {
+      if (user && supabase) {
         const { data: task, error: taskError } = await supabase
           .from("tasks")
           .insert({

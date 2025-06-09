@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
@@ -25,6 +25,11 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
   const [loading, setLoading] = useState(false)
   const debouncedTheme = useDebounce(selectedTheme, 500)
   const { toast } = useToast()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   useEffect(() => {
     if (settings) {
@@ -43,15 +48,15 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
         // Update theme immediately for better UX
         setTheme(debouncedTheme as any)
 
-        if (user && !("isGuest" in user)) { // Only save to Supabase if it's an authenticated user
-          const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (user && !("isGuest" in user) && supabaseClient) { // Only save to Supabase if it's an authenticated user
+          const { data: { user: authUser } } = await supabaseClient.auth.getUser();
           console.log("Auth UID from Supabase:", authUser?.id);
           console.log("Attempting to save theme to Supabase with payload:", {
             user_id: user.id,
             theme: debouncedTheme,
             updated_at: new Date().toISOString(),
           });
-          const { error } = await supabase.from("user_settings").upsert({
+          const { error } = await supabaseClient.from("user_settings").upsert({
             user_id: user.id,
             theme: debouncedTheme,
             updated_at: new Date().toISOString(),
@@ -77,7 +82,7 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
     }
 
     saveTheme()
-  }, [debouncedTheme, theme, user, supabase, setTheme, onSettingsChange, toast])
+  }, [debouncedTheme, theme, user, supabaseClient, setTheme, onSettingsChange, toast])
 
   const themes = [
     {

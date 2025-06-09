@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
 import { TaskCard } from "@/components/task-card"
 import type { Task, TaskGroup as TaskGroupType, UserSettings, User } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

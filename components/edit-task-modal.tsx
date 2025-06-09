@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Task, TaskGroup, UserSettings, Tag, User, GuestUser } from "@/types"
 import { Edit3 } from "lucide-react"
@@ -33,13 +33,18 @@ export default function EditTaskModal({
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const showToast = toast
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleSaveTask = async (formData: any) => {
     setLoading(true)
     try {
-      if (user) {
+      if (user && supabaseClient) {
         // Update in database
-        const { error: taskError } = await supabase
+        const { error: taskError } = await supabaseClient
           .from("tasks")
           .update({
             title: formData.title.trim(),
@@ -55,24 +60,24 @@ export default function EditTaskModal({
         if (taskError) throw taskError
 
         // Update subtasks
-        await supabase.from("subtasks").delete().eq("task_id", task.id)
+        await supabaseClient.from("subtasks").delete().eq("task_id", task.id)
         if (formData.subtasks && formData.subtasks.length > 0) {
           const subtaskInserts = formData.subtasks.map((subtaskTitle: string, index: number) => ({
             task_id: task.id,
             title: subtaskTitle.trim(),
             order_index: index,
           }))
-          await supabase.from("subtasks").insert(subtaskInserts)
+          await supabaseClient.from("subtasks").insert(subtaskInserts)
         }
 
         // Update tags
-        await supabase.from("task_tags").delete().eq("task_id", task.id)
+        await supabaseClient.from("task_tags").delete().eq("task_id", task.id)
         if (formData.selectedTags && formData.selectedTags.length > 0) {
           const tagInserts = formData.selectedTags.map((tagId: string) => ({
             task_id: task.id,
             tag_id: tagId,
           }))
-          await supabase.from("task_tags").insert(tagInserts)
+          await supabaseClient.from("task_tags").insert(tagInserts)
         }
       } else {
         // Update in local storage

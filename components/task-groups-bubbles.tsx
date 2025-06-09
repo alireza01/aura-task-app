@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import type { TaskGroup, User, GuestUser } from "@/types"
 import { Plus } from "lucide-react"
@@ -42,6 +42,11 @@ export default function TaskGroupsBubbles({
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const showToast = toast
   const { theme } = useTheme()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleDragOver = (e: React.DragEvent, groupId: string) => {
     e.preventDefault()
@@ -63,8 +68,8 @@ export default function TaskGroupsBubbles({
 
   const handleDeleteGroup = async (groupId: string) => {
     try {
-      if (user) {
-        const { error } = await supabase.from("task_groups").delete().eq("id", groupId)
+      if (user && supabaseClient) {
+        const { error } = await supabaseClient.from("task_groups").delete().eq("id", groupId)
         if (error) throw error
       } else {
         const updatedGroups = localGroups.filter((g) => g.id !== groupId)

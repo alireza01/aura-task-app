@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { supabase } from "@/lib/supabaseClient"
+import { createClient } from "@/lib/supabase/client"
 import type { User } from "@/types"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
@@ -30,11 +30,17 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const { theme, setTheme } = useTheme()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleSignIn = async () => {
+    if (!supabaseClient) return
     setLoading(true)
     try {
-      await supabase.auth.signInWithOAuth({
+      await supabaseClient.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -48,7 +54,8 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    if (!supabaseClient) return
+    await supabaseClient.auth.signOut()
   }
 
   const debouncedSearchQuery = useDebounce(searchQuery, 500)

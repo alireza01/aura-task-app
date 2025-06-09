@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,7 +45,11 @@ export default function GroupFormModal({
   const [aiLoading, setAiLoading] = useState(false)
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const showToast = toast
-  const supabase = createClientComponentClient()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const isEditMode = !!groupToEdit
   const modalTitle = isEditMode ? `ویرایش گروه: ${groupToEdit.name}` : "ایجاد گروه جدید"
@@ -120,7 +124,7 @@ export default function GroupFormModal({
       const { emoji } = await response.json()
 
       // Update the group with the AI-assigned emoji
-      if (user) {
+      if (user && supabase) {
         await supabase.from("task_groups").update({ emoji }).eq("id", groupId)
       } else {
         // Update local storage
@@ -143,7 +147,7 @@ export default function GroupFormModal({
     try {
       const groupName = data.name.trim()
 
-      if (user) {
+      if (user && supabase) {
         // Save to Supabase
         if (isEditMode) {
           // Update existing group
