@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { toast } from "sonner"
 import { useTheme } from "@/components/theme/theme-provider"
-import GroupFormModal from "./groups/group-form-modal"
+import GroupFormModal from "@/components/modals/group-form-modal"
 import GroupContextMenu from "./groups/group-context-menu"
 import NedaGroupBubble from "./theme/neda-group-bubble"
 

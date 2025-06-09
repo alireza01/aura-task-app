@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import { DraggableTaskCard } from "@/components/draggable-task-card"
+import { DraggableTaskCard } from "@/components/dnd/draggable-task-card"
 import { TaskCard } from "@/components/task-card"
 import type { Task, TaskGroup as TaskGroupType } from "@/types"
 import { ChevronDown, ChevronUp } from "lucide-react"

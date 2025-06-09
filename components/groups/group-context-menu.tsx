@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Edit3, Trash2, FolderOpen } from "lucide-react"
 import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
-import GroupFormModal from "./group-form-modal"
+import GroupFormModal from "@/components/modals/group-form-modal"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useLocalStorage } from "@/hooks/use-local-storage"

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Archive, RotateCcw, ChevronDown, ChevronUp } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { DraggableTaskCard } from './draggable-task-card';
+import { DraggableTaskCard } from './dnd/draggable-task-card';
 
 interface TaskListProps {
   tasks: Task[]

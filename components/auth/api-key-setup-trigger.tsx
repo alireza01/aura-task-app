@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
-import ApiKeySetupModal from "./api-key-setup-modal"
+import ApiKeySetupModal from "@/components/modals/api-key-setup-modal"
 
 interface ApiKeySetupTriggerProps {
   user: User

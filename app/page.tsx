@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import TaskDashboard from "@/components/task-dashboard"
+import TaskDashboard from "@/components/views/task-dashboard"
 
 export default async function Home() {
   const supabase = createClient()

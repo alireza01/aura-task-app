@@ -1,52 +1,56 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { z } from "zod"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
+
+// Define the schema for the request body
+const AssignGroupEmojiSchema = z.object({
+  groupId: z.string().min(1, { message: "Group ID is required" }),
+  emoji: z.string().min(1, { message: "Emoji is required" }).max(4, { message: "Emoji should be a single character" }), // Basic emoji length check
+})
 
 export async function POST(request: NextRequest) {
   try {
-    const { groupName, apiKey } = await request.json()
+    const rawBody = await request.json()
+    const validation = AssignGroupEmojiSchema.safeParse(rawBody)
 
-    if (!groupName || !apiKey) {
-      return NextResponse.json({ error: "نام گروه و کلید API الزامی است" }, { status: 400 })
+    if (!validation.success) {
+      return NextResponse.json({ error: "Invalid request body", details: validation.error.flatten() }, { status: 400 })
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    const { groupId, emoji } = validation.data
 
-    const prompt = `
-      You are an emoji assignment expert. Given a task group name in Persian/Farsi, suggest the most appropriate single emoji that represents the category or theme of that group.
+    // Initialize Supabase client
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-      Group name: "${groupName}"
+    // TODO: Authenticate the user and check permissions if necessary
 
-      Rules:
-      1. Return ONLY the emoji character, nothing else
-      2. Choose an emoji that best represents the category/theme
-      3. Prefer commonly used, recognizable emojis
-      4. Consider Persian/Iranian context when relevant
+    // Update the emoji for the specified group in the database
+    const { data, error } = await supabase
+      .from("task_groups") // Assuming your table is named 'task_groups'
+      .update({ emoji: emoji })
+      .eq("id", groupId)
+      .select() // Optionally select the updated record
 
-      Examples:
-      - کار/شغل → 💼
-      - خانه → 🏠
-      - مطالعه → 📚
-      - ورزش → ⚽
-      - خرید → 🛒
-      - سفر → ✈️
-      - پروژه → 🎯
-
-      Respond with only the emoji:
-    `
-
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    let emoji = response.text().trim()
-
-    // Validate that we got an emoji (basic check)
-    if (!emoji || emoji.length > 4) {
-      emoji = "📁" // Fallback emoji
+    if (error) {
+      console.error("Error updating group emoji in database:", error)
+      return NextResponse.json({ error: "Failed to update group emoji", details: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ emoji })
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: "Group not found or no update occurred" }, { status: 404 })
+    }
+
+    return NextResponse.json({ message: "Emoji assigned successfully", updatedGroup: data[0] })
+
   } catch (error) {
-    console.error("خطا در تخصیص ایموجی:", error)
-    return NextResponse.json({ emoji: "📁" }) // Return fallback emoji instead of error
+    console.error("Error in /api/assign-group-emoji:", error)
+    if (error instanceof z.ZodError) {
+      // Should be caught by validation.success, but as a fallback
+      return NextResponse.json({ error: "Invalid request body due to Zod validation", details: error.flatten() }, { status: 400 });
+    }
+    // General server error
+    return NextResponse.json({ error: "An unexpected error occurred on the server." }, { status: 500 })
   }
 }
