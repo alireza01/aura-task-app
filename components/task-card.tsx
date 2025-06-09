@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,12 +29,18 @@ interface TaskCardProps {
 export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskCardProps) {
   const [showSubtasks, setShowSubtasks] = useState(false)
   const [completingSubtask, setCompletingSubtask] = useState<string | null>(null)
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleCompleteTask = async (checked: boolean) => {
     await onComplete(task.id, checked)
   }
 
   const completeSubtask = async (subtaskId: string) => {
+    if (!supabaseClient) return
     setCompletingSubtask(subtaskId)
     const originalSubtasks = task.subtasks || []
 
@@ -47,7 +53,7 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
     // However, since TaskDashboard now has realtime, onUpdate should trigger a quick re-render.
 
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("subtasks")
         .update({
           completed: true,

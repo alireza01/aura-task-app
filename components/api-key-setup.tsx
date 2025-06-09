@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,11 @@ export default function ApiKeySetup({ onComplete, onSkip }: ApiKeySetupProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [step, setStep] = useState(1)
-  const supabase = createClientComponentClient()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {
@@ -32,6 +36,7 @@ export default function ApiKeySetup({ onComplete, onSkip }: ApiKeySetupProps) {
     setError("")
 
     try {
+      if (!supabase) throw new Error("Supabase client not initialized")
       const {
         data: { user },
       } = await supabase.auth.getUser()

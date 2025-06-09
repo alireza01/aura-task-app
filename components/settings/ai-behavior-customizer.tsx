@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -31,6 +31,11 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
   const debouncedAutoRanking = useDebounce(autoRanking, 500)
   const debouncedAutoSubtasks = useDebounce(autoSubtasks, 500)
   const { toast } = useToast()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   useEffect(() => {
     if (settings) {
@@ -59,7 +64,8 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
       setLoading(true)
 
       try {
-        const { error } = await supabase.from("user_settings").upsert({
+        if (!supabaseClient) throw new Error("Supabase client not initialized")
+        const { error } = await supabaseClient.from("user_settings").upsert({
           user_id: user.id,
           speed_weight: debouncedSpeedWeight,
           importance_weight: debouncedImportanceWeight,
@@ -91,7 +97,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
     debouncedAutoSubtasks,
     settings,
     user.id,
-    supabase,
+    supabaseClient,
     onSettingsChange,
     toast,
   ])

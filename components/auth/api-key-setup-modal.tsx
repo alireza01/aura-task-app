@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +40,11 @@ export default function ApiKeySetupModal({ user, isOpen, onClose, onApiKeySet }:
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   // Reset state when modal opens
   useEffect(() => {
@@ -105,7 +110,8 @@ export default function ApiKeySetupModal({ user, isOpen, onClose, onApiKeySet }:
 
     try {
       // Save API key to user settings
-      const { error: updateError } = await supabase.from("user_settings").upsert({
+      if (!supabaseClient) throw new Error("Supabase client not initialized")
+      const { error: updateError } = await supabaseClient.from("user_settings").upsert({
         user_id: user.id,
         gemini_api_key: apiKeyInput.trim(),
         updated_at: new Date().toISOString(),

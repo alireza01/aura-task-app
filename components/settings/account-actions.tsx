@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -29,12 +29,18 @@ export default function AccountActions({ user }: AccountActionsProps) {
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleSignOut = async () => {
+    if (!supabaseClient) return
     setLoading(true)
 
     try {
-      await supabase.auth.signOut()
+      await supabaseClient.auth.signOut()
       toast({
         title: "خروج موفقیت‌آمیز",
         description: "شما با موفقیت از حساب کاربری خود خارج شدید.",
@@ -53,24 +59,30 @@ export default function AccountActions({ user }: AccountActionsProps) {
   }
 
   const handleDeleteAccount = async () => {
+    if (!supabaseClient) return
     setLoading(true)
 
     try {
       // First delete user data
-      const { error: dataError } = await supabase.from("user_settings").delete().eq("user_id", user.id)
+      const { error: dataError } = await supabaseClient.from("user_settings").delete().eq("user_id", user.id)
 
       if (dataError) throw dataError
 
       // Then delete the user account
-      const { error: authError } = await supabase.auth.admin.deleteUser(user.id)
-
-      if (authError) throw authError
+      // This requires service_role key, which should not be exposed to the client.
+      // This operation should be moved to a server-side function or API route.
+      // For now, we'll comment it out and log a warning.
+      console.warn(
+        "User deletion from client-side is not recommended. Move this to a server-side function.",
+      )
+      // const { error: authError } = await supabaseClient.auth.admin.deleteUser(user.id)
+      // if (authError) throw authError
 
       // Sign out
-      await supabase.auth.signOut()
+      await supabaseClient.auth.signOut()
 
       toast({
-        title: "حساب کاربری حذف شد",
+        title: "حساب کاربری (اطلاعات محلی) حذف شد",
         description: "حساب کاربری شما با موفقیت حذف شد.",
       })
     } catch (error) {

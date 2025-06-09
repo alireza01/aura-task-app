@@ -2,7 +2,7 @@
 import React from 'react';
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import type { User, Task, TaskGroup, UserSettings, Tag, GuestUser } from '@/types'
 import Header from '@/components/header'
 import TaskList from '@/components/task-list'
@@ -54,6 +54,11 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   // Filters
   const [filterGroup, setFilterGroup] = useState<string | null>(null)
@@ -140,7 +145,8 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
               return updatedPrev;
             });
 
-            const { error } = await supabase.from("tasks").upsert(updates);
+            if (!supabaseClient) throw new Error("Supabase client not initialized")
+            const { error } = await supabaseClient.from("tasks").upsert(updates);
             if (error) throw error;
             toast({ title: "وظیفه به‌روزرسانی شد", description: "ترتیب وظایف با موفقیت به‌روزرسانی شد." });
             await loadTasks(); // Re-fetch to ensure consistency
@@ -165,7 +171,8 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
             )
           );
 
-          const { error } = await supabase
+          if (!supabaseClient) throw new Error("Supabase client not initialized")
+          const { error } = await supabaseClient
             .from("tasks")
             .update({ group_id: newGroupId, order_index: newOrderIndex })
             .eq("id", taskId);
@@ -205,9 +212,9 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
   }, [user, localGuestUser, setLocalGuestUser])
 
   const loadTasks = useCallback(async () => {
-    if (!user) return
+    if (!user || !supabaseClient) return
 
-    const { data } = await supabase
+    const { data } = await supabaseClient
       .from("tasks")
       .select(`
         *,
@@ -221,25 +228,25 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
   }, [user])
 
   const loadGroups = useCallback(async () => {
-    if (!user) return
+    if (!user || !supabaseClient) return
 
-    const { data } = await supabase.from("task_groups").select("*").eq("user_id", user.id).order("created_at")
+    const { data } = await supabaseClient.from("task_groups").select("*").eq("user_id", user.id).order("created_at")
 
     if (data) setGroups(data)
-  }, [user])
+  }, [user, supabaseClient])
 
   const loadTags = useCallback(async () => {
-    if (!user) return
+    if (!user || !supabaseClient) return
 
-    const { data } = await supabase.from("tags").select("*").eq("user_id", user.id).order("name")
+    const { data } = await supabaseClient.from("tags").select("*").eq("user_id", user.id).order("name")
 
     if (data) setTags(data)
-  }, [user])
+  }, [user, supabaseClient])
 
   const loadSettings = useCallback(async () => {
-    if (!user) return
+    if (!user || !supabaseClient) return
 
-    const { data } = await supabase.from("user_settings").select("*").eq("user_id", user.id).single()
+    const { data } = await supabaseClient.from("user_settings").select("*").eq("user_id", user.id).single()
 
     if (data) {
       setSettings(data)
@@ -252,22 +259,22 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
   }, [user])
 
   const loadUserData = useCallback(async () => {
-    if (!user) return
+    if (!user || !supabaseClient) return
 
     setLoading(true)
     await Promise.all([loadTasks(), loadGroups(), loadTags(), loadSettings()])
     setLoading(false)
-  }, [user, loadTasks, loadGroups, loadSettings])
+  }, [user, supabaseClient, loadTasks, loadGroups, loadTags, loadSettings])
 
   const migrateLocalData = useCallback(async () => {
-    if (!user || localTasks.length === 0) return
+    if (!user || !supabaseClient || localTasks.length === 0) return
 
     try {
       // Migrate groups first
       const groupMigrationMap: { [key: string]: string } = {}
 
       for (const localGroup of localGroups) {
-        const { data: newGroup } = await supabase
+        const { data: newGroup } = await supabaseClient
           .from("task_groups")
           .insert({
             user_id: user.id,
@@ -286,7 +293,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
       const tagMigrationMap: { [key: string]: string } = {}
 
       for (const localTag of localTags) {
-        const { data: newTag } = await supabase
+        const { data: newTag } = await supabaseClient
           .from("tags")
           .insert({
             user_id: user.id,
@@ -305,7 +312,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
       for (const localTask of localTasks) {
         const newGroupId = localTask.group_id ? groupMigrationMap[localTask.group_id] : null
 
-        const { data: newTask } = await supabase
+        const { data: newTask } = await supabaseClient
           .from("tasks")
           .insert({
             user_id: user.id,
@@ -331,14 +338,14 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
             order_index: subtask.order_index,
           }))
 
-          await supabase.from("subtasks").insert(subtaskInserts)
+          await supabaseClient.from("subtasks").insert(subtaskInserts)
         }
 
         if (newTask && localTask.tags?.length) {
           // Create task-tag relationships
           for (const tag of localTask.tags) {
             if (tagMigrationMap[tag.id]) {
-              await supabase.from("task_tags").insert({
+              await supabaseClient.from("task_tags").insert({
                 task_id: newTask.id,
                 tag_id: tagMigrationMap[tag.id],
               })
@@ -367,7 +374,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         variant: "destructive",
       })
     }
-  }, [user, localTasks, localGroups, localTags, toast, loadUserData])
+  }, [user, supabaseClient, localTasks, localGroups, localTags, toast, loadUserData])
 
   // Load data based on user status
   useEffect(() => {
@@ -385,9 +392,9 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
 
   // Supabase Realtime Subscription
   useEffect(() => {
-    if (!user) return
+    if (!user || !supabaseClient) return
 
-    const tasksChannel = supabase
+    const tasksChannel = supabaseClient
       .channel("public:tasks")
       .on(
         "postgres_changes",
@@ -406,7 +413,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
       )
       .subscribe()
 
-    const subtasksChannel = supabase
+    const subtasksChannel = supabaseClient
       .channel("public:subtasks")
       .on(
         "postgres_changes",
@@ -422,10 +429,12 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(tasksChannel)
-      supabase.removeChannel(subtasksChannel)
+      if (supabaseClient) {
+        supabaseClient.removeChannel(tasksChannel)
+        supabaseClient.removeChannel(subtasksChannel)
+      }
     }
-  }, [user, loadTasks])
+  }, [user, supabaseClient, loadTasks])
 
   const applyFilters = useCallback(() => {
     let result = [...tasks]
@@ -514,8 +523,8 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
     setFilteredTasks((prevFilteredTasks) => prevFilteredTasks.filter((task) => task.id !== taskId))
 
     try {
-      if (user) {
-        const { error } = await supabase.from("tasks").delete().eq("id", taskId)
+      if (user && supabaseClient) {
+        const { error } = await supabaseClient.from("tasks").delete().eq("id", taskId)
         if (error) throw error
       } else {
         const updatedTasks = localTasks.filter((task) => task.id !== taskId)
@@ -535,7 +544,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         variant: "destructive",
       })
     }
-  }, [user, tasks, localTasks, setLocalTasks, toast])
+  }, [user, supabaseClient, tasks, localTasks, setLocalTasks, toast])
 
   const completeTask = useCallback(async (taskId: string, completed: boolean) => {
     // Optimistic update
@@ -548,8 +557,8 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
     )
 
     try {
-      if (user) {
-        const { error } = await supabase
+      if (user && supabaseClient) {
+        const { error } = await supabaseClient
           .from("tasks")
           .update({ completed, completed_at: completed ? new Date().toISOString() : null })
           .eq("id", taskId)
@@ -574,29 +583,29 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
         variant: "destructive",
       })
     }
-  }, [user, tasks, localTasks, setLocalTasks, toast])
+  }, [user, supabaseClient, tasks, localTasks, setLocalTasks, toast])
 
   const handleTaskAdded = useCallback(async () => {
-    if (user) {
+    if (user && supabaseClient) {
       await loadTasks() // Realtime will handle this, but keep for initial load consistency
     } else {
       setTasks([...localTasks])
     }
-  }, [user, loadTasks, localTasks])
+  }, [user, supabaseClient, loadTasks, localTasks])
 
   const handleSettingsChange = useCallback(() => {
-    if (user) {
+    if (user && supabaseClient) {
       loadSettings()
     }
-  }, [user, loadSettings])
+  }, [user, supabaseClient, loadSettings])
 
   const handleTagsChange = useCallback(() => {
-    if (user) {
+    if (user && supabaseClient) {
       loadTags()
     } else {
       setTags([...localTags])
     }
-  }, [user, loadTags, localTags])
+  }, [user, supabaseClient, loadTags, localTags])
 
   const clearFilters = useCallback(() => {
     setSearchQuery("")
@@ -614,8 +623,8 @@ const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: str
     );
 
     try {
-      if (user) {
-        const { error } = await supabase
+      if (user && supabaseClient) {
+        const { error } = await supabaseClient
           .from("tasks")
           .update({ group_id: newGroupId })
           .eq("id", taskId);
@@ -639,7 +648,7 @@ const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: str
         variant: "destructive",
       });
     }
-  }, [user, tasks, localTasks, setLocalTasks, toast]);
+  }, [user, supabaseClient, tasks, localTasks, setLocalTasks, toast]);
 
   const hasActiveFilters = searchQuery || filterGroup || filterStatus !== "all" || filterPriority !== "all" || filterTag
 

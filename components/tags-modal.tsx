@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +40,11 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
   const [loading, setLoading] = useState(false)
   const [localTags, setLocalTags] = useLocalStorage<Tag[]>("aura-tags", [])
   const showToast = toast
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleAddTag = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,8 +62,8 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
         updated_at: new Date().toISOString(),
       }
 
-      if (user) {
-        const { data, error } = await supabase
+      if (user && supabaseClient) {
+        const { data, error } = await supabaseClient
           .from("tags")
           .insert({
             user_id: user.id,
@@ -99,8 +104,8 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
     setLoading(true)
 
     try {
-      if (user) {
-        const { error } = await supabase
+      if (user && supabaseClient) {
+        const { error } = await supabaseClient
           .from("tags")
           .update({
             name: editingTag.name,
@@ -139,8 +144,8 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
     setLoading(true)
 
     try {
-      if (user) {
-        const { error } = await supabase.from("tags").delete().eq("id", tagId)
+      if (user && supabaseClient) {
+        const { error } = await supabaseClient.from("tags").delete().eq("id", tagId)
         if (error) throw error
       } else {
         const updatedTags = localTags.filter((t) => t.id !== tagId)

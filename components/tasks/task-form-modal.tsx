@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -40,6 +40,11 @@ export default function TaskFormModal({
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const showToast = toast
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const isEditMode = !!taskToEdit
   const modalTitle = isEditMode ? `ویرایش وظیفه: ${taskToEdit?.title}` : "ایجاد وظیفه جدید"
@@ -68,11 +73,11 @@ export default function TaskFormModal({
     setLoading(true)
 
     try {
-      if (user) {
+      if (user && supabaseClient) {
         // Save to Supabase
         if (isEditMode) {
           // Update existing task
-          const { error: taskError } = await supabase
+          const { error: taskError } = await supabaseClient
             .from("tasks")
             .update({
               title: taskData.title,
@@ -90,7 +95,7 @@ export default function TaskFormModal({
           // Handle subtasks update
           if (taskData.subtasks && taskData.subtasks.length > 0) {
             // Delete existing subtasks
-            await supabase.from("subtasks").delete().eq("task_id", taskToEdit!.id)
+            await supabaseClient.from("subtasks").delete().eq("task_id", taskToEdit!.id)
 
             // Insert new subtasks
             const subtaskInserts = taskData.subtasks.map((subtask: string, index: number) => ({
@@ -99,7 +104,7 @@ export default function TaskFormModal({
               order_index: index,
             }))
 
-            await supabase.from("subtasks").insert(subtaskInserts)
+            await supabaseClient.from("subtasks").insert(subtaskInserts)
           }
 
           showToast("وظیفه به‌روزرسانی شد", {
@@ -107,7 +112,7 @@ export default function TaskFormModal({
           })
         } else {
           // Create new task
-          const { data: newTask, error: taskError } = await supabase
+          const { data: newTask, error: taskError } = await supabaseClient
             .from("tasks")
             .insert({
               user_id: user.id,
@@ -132,7 +137,7 @@ export default function TaskFormModal({
               order_index: index,
             }))
 
-            await supabase.from("subtasks").insert(subtaskInserts)
+            await supabaseClient.from("subtasks").insert(subtaskInserts)
           }
 
           showToast("وظیفه ایجاد شد", {

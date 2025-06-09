@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +28,11 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const { toast } = useToast()
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   useEffect(() => {
     if (settings?.gemini_api_key) {
@@ -76,7 +81,8 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
       setTesting(false)
 
       // Save to database
-      const { error: dbError } = await supabase.from("user_settings").upsert({
+      if (!supabaseClient) throw new Error("Supabase client not initialized")
+      const { error: dbError } = await supabaseClient.from("user_settings").upsert({
         user_id: user.id,
         gemini_api_key: apiKey.trim(),
         updated_at: new Date().toISOString(),
@@ -115,7 +121,8 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
     setLoading(true)
 
     try {
-      const { error } = await supabase
+      if (!supabaseClient) throw new Error("Supabase client not initialized")
+      const { error } = await supabaseClient
         .from("user_settings")
         .update({
           gemini_api_key: null,

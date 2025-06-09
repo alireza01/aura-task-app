@@ -13,7 +13,7 @@ import { MoreHorizontal, Edit3, Trash2, FolderOpen } from "lucide-react"
 import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
 import GroupFormModal from "./group-form-modal"
 import { toast } from "sonner"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
 interface GroupContextMenuProps {
@@ -38,7 +38,11 @@ export default function GroupContextMenu({
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
   const showToast = toast
-  const supabase = createClientComponentClient()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const handleDeleteGroup = async () => {
     if (taskCount > 0) {
@@ -56,7 +60,7 @@ export default function GroupContextMenu({
     setLoading(true)
 
     try {
-      if (user) {
+      if (user && supabase) {
         const { error } = await supabase.from("task_groups").delete().eq("id", group.id)
         if (error) throw error
       } else {

@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import ApiKeySetupModal from "./api-key-setup-modal"
 
 interface ApiKeySetupTriggerProps {
@@ -13,15 +13,23 @@ interface ApiKeySetupTriggerProps {
 export default function ApiKeySetupTrigger({ user, onApiKeySet }: ApiKeySetupTriggerProps) {
   const [showModal, setShowModal] = useState(false)
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
 
   useEffect(() => {
-    checkApiKeyStatus()
-  }, [user])
+    setSupabaseClient(createClient())
+  }, [])
+
+  useEffect(() => {
+    if (supabaseClient) {
+      checkApiKeyStatus()
+    }
+  }, [user, supabaseClient])
 
   const checkApiKeyStatus = async () => {
+    if (!supabaseClient) return
     try {
       // Check if user has API key in settings
-      const { data: settings } = await supabase
+      const { data: settings } = await supabaseClient
         .from("user_settings")
         .select("gemini_api_key")
         .eq("user_id", user.id)

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,11 +15,17 @@ interface SignInPromptModalProps {
 
 export default function SignInPromptModal({ onClose, onSignIn }: SignInPromptModalProps) {
   const [loading, setLoading] = useState(false)
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabaseClient(createClient())
+  }, [])
 
   const handleSignIn = async () => {
+    if (!supabaseClient) return
     setLoading(true)
     try {
-      await supabase.auth.signInWithOAuth({
+      await supabaseClient.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,

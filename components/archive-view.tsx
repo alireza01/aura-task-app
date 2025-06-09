@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,12 +29,17 @@ export default function ArchiveView({
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const [loading, setLoading] = useState<string | null>(null)
   const { toast } = useToast()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const handleUnarchive = async (taskId: string) => {
     setLoading(taskId)
 
     try {
-      if (user) {
+      if (user && supabase) {
         await supabase
           .from("tasks")
           .update({
@@ -75,7 +80,7 @@ export default function ArchiveView({
     setLoading(taskId)
 
     try {
-      if (user) {
+      if (user && supabase) {
         await supabase.from("tasks").delete().eq("id", taskId)
       } else {
         const updatedTasks = localTasks.filter((task) => task.id !== taskId)
