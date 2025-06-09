@@ -2,7 +2,7 @@
 import React from 'react';
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createSupabaseBrowserClient } from '@/lib/supabaseClient';
 import type { User, Task, TaskGroup, UserSettings, Tag, GuestUser } from '@/types'
 import Header from '@/components/header'
 import TaskList from '@/components/task-list'
@@ -32,6 +32,7 @@ interface TaskDashboardProps {
 }
 
 export default function TaskDashboard({ user }: TaskDashboardProps) {
+  const supabase = createSupabaseBrowserClient();
   // State
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])

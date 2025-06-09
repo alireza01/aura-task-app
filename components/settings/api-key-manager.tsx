@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@supabase/auth-helpers-nextjs"
+import { createSupabaseBrowserClient } from '@/lib/supabaseClient';
+import type { User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,7 @@ interface ApiKeyManagerProps {
 }
 
 export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiKeyManagerProps) {
+  const supabase = createSupabaseBrowserClient();
   const [apiKey, setApiKey] = useState("")
   const [showApiKey, setShowApiKey] = useState(false)
   const [loading, setLoading] = useState(false)

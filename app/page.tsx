@@ -1,5 +1,4 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createSupabaseServerClient } from '@/lib/supabaseClient';
 import TaskDashboard from "@/components/task-dashboard"
 
 export default async function Home() {

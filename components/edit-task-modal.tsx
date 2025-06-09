@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { createSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Task, TaskGroup, UserSettings, Tag, User, GuestUser } from "@/types"
 import { Edit3 } from "lucide-react"
@@ -30,6 +30,7 @@ export default function EditTaskModal({
   onClose,
   onTaskUpdated,
 }: EditTaskModalProps) {
+  const supabase = createSupabaseBrowserClient();
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const showToast = toast

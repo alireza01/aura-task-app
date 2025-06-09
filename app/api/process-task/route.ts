@@ -1,13 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createSupabaseServerClient } from '@/lib/supabaseClient';
 
 export async function POST(request: NextRequest) {
   try {
     const { title, description, autoRanking, autoSubtasks, userId } = await request.json()
 
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createSupabaseServerClient();
 
     // Get user's API key
     const { data: settings } = await supabase

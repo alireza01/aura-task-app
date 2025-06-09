@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import type { GuestUser, TaskGroup, Tag, UserSettings, User, Task } from "@/types/index"
-import { supabase } from "@/lib/supabaseClient"
+import { createSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
@@ -31,6 +31,7 @@ export default function AddTaskModal({
   onTaskAdded,
   initialTitle = "",
 }: AddTaskModalProps) {
+  const supabase = createSupabaseBrowserClient();
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const { toast } = useToast()
