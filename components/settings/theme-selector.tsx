@@ -21,68 +21,29 @@ interface ThemeSelectorProps {
 
 export default function ThemeSelector({ user, settings, onSettingsChange }: ThemeSelectorProps) {
   const { theme, setTheme } = useTheme()
+  // Initialize selectedTheme with the theme from context, update if settings prop changes.
   const [selectedTheme, setSelectedTheme] = useState<string>(theme)
-  const [loading, setLoading] = useState(false)
-  const debouncedTheme = useDebounce(selectedTheme, 500)
-  const { toast } = useToast()
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+  const { toast } = useToast() // Retain toast for other potential uses or remove if not used elsewhere
 
   useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+    // Reflect theme from useTheme context
+    setSelectedTheme(theme)
+  }, [theme])
 
   useEffect(() => {
+    // If initial settings are provided, they might override the context theme initially
+    // or update if settings prop changes externally.
     if (settings) {
       setSelectedTheme(settings.theme || "default")
     }
   }, [settings])
 
-  // Save theme when debounced value changes
-  useEffect(() => {
-    const saveTheme = async () => {
-      if (debouncedTheme === theme) return
-
-      setLoading(true)
-
-      try {
-        // Update theme immediately for better UX
-        setTheme(debouncedTheme as any)
-
-        if (user && !("isGuest" in user) && supabaseClient) { // Only save to Supabase if it's an authenticated user
-          const { data: { user: authUser } } = await supabaseClient.auth.getUser();
-          console.log("Auth UID from Supabase:", authUser?.id);
-          console.log("Attempting to save theme to Supabase with payload:", {
-            user_id: user.id,
-            theme: debouncedTheme,
-            updated_at: new Date().toISOString(),
-          });
-          const { error } = await supabaseClient.from("user_settings").upsert({
-            user_id: user.id,
-            theme: debouncedTheme,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' });
-
-          if (error) {
-            console.error("Supabase upsert error object:", error)
-            throw error
-          }
-        }
-
-        onSettingsChange()
-      } catch (error) {
-        console.error("خطا در ذخیره تم:", JSON.stringify(error, null, 2))
-        toast({
-          title: "خطا در ذخیره تم",
-          description: "مشکلی در ذخیره تم رخ داد. لطفاً دوباره تلاش کنید.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    saveTheme()
-  }, [debouncedTheme, theme, user, supabaseClient, setTheme, onSettingsChange, toast])
+  const handleThemeChange = (newThemeValue: string) => {
+    const newTheme = newThemeValue as "default" | "alireza" | "neda" // Cast to Theme type
+    setSelectedTheme(newTheme) // Update local state for UI responsiveness
+    setTheme(newTheme) // Update theme in context, ThemeProvider handles saving
+    onSettingsChange() // Callback for parent component
+  }
 
   const themes = [
     {
@@ -118,7 +79,7 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
         <CardDescription>ظاهر اپلیکیشن را مطابق سلیقه خود تنظیم کنید.</CardDescription>
       </CardHeader>
       <CardContent>
-        <RadioGroup value={selectedTheme} onValueChange={setSelectedTheme} className="space-y-4" disabled={loading}>
+        <RadioGroup value={selectedTheme} onValueChange={handleThemeChange} className="space-y-4">
           {themes.map((themeOption) => (
             <div key={themeOption.id} className="relative">
               <motion.div
@@ -161,17 +122,6 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
             </div>
           ))}
         </RadioGroup>
-
-        {loading && (
-          <div className="mt-4 text-center">
-            <div className="loading-dots">
-              <div></div>
-              <div></div>
-              <div></div>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">در حال اعمال تم...</p>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
