@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
-import { signOut } from "@/lib/auth/actions"
+import { signOut, linkGoogleAccount } from "@/lib/auth/actions" // Added linkGoogleAccount
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -20,10 +20,22 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
-import { UserIcon, LogOut, Trash2 } from "lucide-react"
+import { UserIcon, LogOut, Trash2, Chrome } from "lucide-react" // Added Chrome
+
+// Define a more specific User type for this component's props,
+// including properties from your 'profiles' table if needed.
+interface ProfiledUser extends User {
+  // Assuming is_guest comes from your profiles table or is added to the user object
+  is_guest?: boolean;
+  user_metadata: { // Ensure user_metadata is explicitly typed
+    avatar_url?: string;
+    full_name?: string;
+    [key: string]: any; // Allow other metadata properties
+  };
+}
 
 interface AccountActionsProps {
-  user: User
+  user: ProfiledUser // Use the more specific user type
 }
 
 export default function AccountActions({ user }: AccountActionsProps) {
@@ -34,19 +46,21 @@ export default function AccountActions({ user }: AccountActionsProps) {
   const supabaseClient = createClient()
   const router = useRouter()
 
-  const handleSignOut = async () => {
+  const handleSignOutSubmit = async () => { // Renamed from handleSignOut
     setLoading(true)
     try {
-      await signOut(router)
+      // This function is now primarily for the dialog confirmation.
+      // The actual sign-out is a server action.
+      await signOut(router) // Assuming signOut still takes router for navigation post-action
       toast({
         title: "خروج موفقیت‌آمیز",
         description: "شما با موفقیت از حساب کاربری خود خارج شدید.",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error signing out:", error)
       toast({
         title: "خطا در خروج از حساب کاربری",
-        description: "مشکلی در خروج از حساب کاربری رخ داد. لطفاً دوباره تلاش کنید.",
+        description: error.message || "مشکلی در خروج از حساب کاربری رخ داد. لطفاً دوباره تلاش کنید.",
         variant: "destructive",
       })
     } finally {
@@ -56,51 +70,34 @@ export default function AccountActions({ user }: AccountActionsProps) {
   }
 
   const handleDeleteAccount = async () => {
-    // No direct call to supabaseClient.auth.signOut() here, so no change for signOut action.
-    // However, if a sign out is desired after account deletion, it should be added.
-    // For now, this function remains as is regarding the new signOut action.
     if (!supabaseClient) return
     setLoading(true)
 
     try {
-      // First delete user data
+      // First delete user data from 'user_settings'
       const { error: dataError } = await supabaseClient.from("user_settings").delete().eq("user_id", user.id)
-
       if (dataError) throw dataError
 
-      // Then delete the user account
-      // This requires service_role key, which should not be exposed to the client.
-      // This operation should be moved to a server-side function or API route.
-      // For now, we'll comment it out and log a warning.
       console.warn(
-        "User deletion from client-side is not recommended. Move this to a server-side function.",
+        "User data deletion from 'user_settings' attempted. Actual user account deletion from Supabase Auth should be a secure server-side function using a service_role key.",
       )
-      // const { error: authError } = await supabaseClient.auth.admin.deleteUser(user.id)
+      // const { error: authError } = await supabaseClient.auth.admin.deleteUser(user.id) // Needs admin rights, move to server
       // if (authError) throw authError
 
-      // Sign out
-      // await supabaseClient.auth.signOut() // Original line
-      // If redirection is needed after account deletion, call signOut(router) here.
-      // For now, assume the existing behavior (toast then dialog close) is sufficient.
-      // If a full sign-out and redirect is needed, this would be:
-      // await signOut(router);
-      // However, this might conflict with the toast message below if signOut also shows one.
-      // For now, let's keep the existing supabaseClient.auth.signOut() for this specific case
-      // as it's part of a larger "delete account" flow, not just a simple sign-out.
-      // The subtask is about refactoring the main sign-out actions.
-      // If this needs to change, a new subtask should address it.
+      // For now, just signing out locally after attempting to delete data.
+      // The user will be signed out, but their auth entry might still exist.
       await supabaseClient.auth.signOut()
-
+      router.refresh() // Refresh to update UI state, redirect to home or login might be better.
 
       toast({
-        title: "حساب کاربری (اطلاعات محلی) حذف شد",
-        description: "حساب کاربری شما با موفقیت حذف شد.",
+        title: "اطلاعات کاربری محلی حذف شد",
+        description: "اطلاعات کاربری شما از این دستگاه حذف شد. برای حذف کامل حساب، با پشتیبانی تماس بگیرید.",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("خطا در حذف حساب کاربری:", error)
       toast({
         title: "خطا در حذف حساب کاربری",
-        description: "مشکلی در حذف حساب کاربری رخ داد. لطفاً دوباره تلاش کنید.",
+        description: error.message || "مشکلی در حذف حساب کاربری رخ داد. لطفاً دوباره تلاش کنید.",
         variant: "destructive",
       })
     } finally {
@@ -109,7 +106,8 @@ export default function AccountActions({ user }: AccountActionsProps) {
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "تاریخ نامشخص";
     const date = new Date(dateString)
     return date.toLocaleDateString("fa-IR", {
       year: "numeric",
@@ -118,6 +116,33 @@ export default function AccountActions({ user }: AccountActionsProps) {
     })
   }
 
+  // Conditional rendering for Guest User
+  if (user.is_guest) {
+    return (
+      <Card className="glass-card border-0">
+        <CardHeader>
+          <CardTitle>حساب کاربری مهمان</CardTitle>
+          <CardDescription>
+            شما در حال حاضر از یک حساب کاربری مهمان استفاده می‌کنید. برای ذخیره دائمی اطلاعات و دسترسی به تمام امکانات، حساب خود را با گوگل پیوند دهید.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={linkGoogleAccount}>
+            <Button type="submit" className="w-full" disabled={loading}>
+              <Chrome className="ml-2 h-4 w-4" /> {/* Adjusted icon margin for RTL */}
+              پیوند با حساب گوگل
+            </Button>
+          </form>
+          {/* A loading state specifically for this form could be added if desired */}
+          {/* For example, using a local state like [isLinking, setIsLinking] */}
+          {/* and setting it within a try/finally block if linkGoogleAccount was called here directly */}
+          {/* However, with server actions, Next.js handles form submission states. */}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Default view for registered users
   return (
     <>
       <Card className="glass-card border-0">
@@ -151,7 +176,7 @@ export default function AccountActions({ user }: AccountActionsProps) {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => setShowSignOutDialog(true)}
+                onClick={() => setShowSignOutDialog(true)} // Opens dialog
                 disabled={loading}
               >
                 <LogOut className="h-4 w-4 ml-2" />
@@ -163,7 +188,7 @@ export default function AccountActions({ user }: AccountActionsProps) {
               <Button
                 variant="destructive"
                 className="w-full justify-start"
-                onClick={() => setShowDeleteAccountDialog(true)}
+                onClick={() => setShowDeleteAccountDialog(true)} // Opens dialog
                 disabled={loading}
               >
                 <Trash2 className="h-4 w-4 ml-2" />
@@ -183,7 +208,7 @@ export default function AccountActions({ user }: AccountActionsProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={loading}>انصراف</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSignOut} disabled={loading}>
+            <AlertDialogAction onClick={handleSignOutSubmit} disabled={loading}>
               {loading ? "در حال خروج..." : "خروج"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -196,8 +221,7 @@ export default function AccountActions({ user }: AccountActionsProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>حذف حساب کاربری</AlertDialogTitle>
             <AlertDialogDescription>
-              آیا مطمئن هستید که می‌خواهید حساب کاربری خود را حذف کنید؟ این عمل غیرقابل بازگشت است و تمام داده‌های شما حذف
-              خواهد شد.
+              آیا مطمئن هستید که می‌خواهید اطلاعات کاربری خود را از این دستگاه حذف کنید؟ برای حذف کامل حساب، با پشتیبانی تماس بگیرید.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -207,7 +231,7 @@ export default function AccountActions({ user }: AccountActionsProps) {
               disabled={loading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {loading ? "در حال حذف..." : "حذف حساب کاربری"}
+              {loading ? "در حال حذف..." : "حذف اطلاعات"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
