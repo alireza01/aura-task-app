@@ -127,15 +127,14 @@ export default function NedaGroupBubble({
 
   return (
     <>
-      <motion.div
+      <motion.button
+        type="button"
         ref={bubbleRef}
         onClick={onClick}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         whileTap={{ scale: 0.95 }}
-        role="button"
-        tabIndex={0}
         className={cn(
           "relative flex-shrink-0 px-6 py-4 rounded-3xl transition-all duration-300 min-w-[140px] group",
           "bg-gradient-to-br from-neda-accent-purple to-neda-accent-pink",
@@ -184,35 +183,31 @@ export default function NedaGroupBubble({
 
         {/* Delete button (appears on hover) */}
         {onDelete && (
-          <div
-            role="button"
-            tabIndex={0}
+          <motion.button
+            type="button"
             onClick={(e) => {
               e.stopPropagation()
               handleDelete()
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.stopPropagation()
-                handleDelete()
-              }
-            }}
+            // onKeyDown is implicitly handled by button for Enter/Space
             className="absolute -top-2 -right-2 w-6 h-6 bg-neda-accent-pink rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-400 cursor-pointer"
+            aria-label={`Delete group ${group.name}`}
           >
-            <span className="text-white text-xs">×</span>
-          </div>
+            <span className="text-white text-xs" aria-hidden="true">×</span>
+          </motion.button>
         )}
 
-        {/* Ripple effect on click */}
-        <div className="absolute inset-0 rounded-3xl overflow-hidden">
-          <motion.div
-            className="absolute inset-0 bg-white"
-            initial={{ scale: 0, opacity: 0.5 }}
-            whileTap={{ scale: 2, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          />
-        </div>
-      </motion.div>
+        {/* Ripple effect on click - this might need to be adjusted if it was relying on the parent div structure */}
+        {/* For a button, the ripple can be a child of the button directly. */}
+        <motion.div
+          className="absolute inset-0 bg-white pointer-events-none" // Make sure ripple doesn't interfere with button clicks
+          initial={{ scale: 0, opacity: 0.5 }}
+          animate={isSelected ? { scale: 2, opacity: 0 } : {}} // Trigger ripple on isSelected or another prop if needed
+                                                              // Or keep whileTap if preferred, but ensure it works with button
+          whileTap={{ scale: 2, opacity: 0 }} // This should still work with motion.button
+          transition={{ duration: 0.4 }}
+        />
+      </motion.button>
 
       <BubbleEffects trigger={showDeleteEffect} type="pop" x={effectPosition.x} y={effectPosition.y} />
     </>

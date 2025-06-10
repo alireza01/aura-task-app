@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import type { TaskGroup, Tag, UserSettings, User, Task } from "@/types/index" // Removed GuestUser
 import { createClient } from "@/lib/supabase/client"
+import { generateFractionalIndex } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
 // import { useLocalStorage } from "@/hooks/use-local-storage" // Removed
@@ -43,6 +44,26 @@ export default function AddTaskModal({
         throw new Error("User not available. Cannot save task.");
       }
 
+      // Determine order_index for the new task
+      let lastTaskOrderIndex: string | null = null;
+      const { data: lastTaskArr, error: fetchError } = await supabase
+        .from("tasks")
+        .select("order_index")
+        .eq("user_id", user.id)
+        .order("order_index", { ascending: false }) // Get the one with largest current index
+        .limit(1);
+
+      if (fetchError) {
+        console.warn("Error fetching last task for order_index, will default to '1.0' or similar:", fetchError.message);
+        // Allow proceeding, generateFractionalIndex will handle null prev
+      }
+
+      if (lastTaskArr && lastTaskArr.length > 0 && lastTaskArr[0].order_index != null) {
+        lastTaskOrderIndex = lastTaskArr[0].order_index;
+      }
+
+      const newOrderIndex = generateFractionalIndex(lastTaskOrderIndex, null);
+
       // Always save to Supabase
       const { data: task, error: taskError } = await supabase
         .from("tasks")
@@ -54,7 +75,7 @@ export default function AddTaskModal({
           speed_score: formData.speedScore,
           importance_score: formData.importanceScore,
           emoji: formData.emoji,
-          order_index: 0, // TODO: Determine correct order_index, perhaps based on existing tasks for the user
+          order_index: newOrderIndex,
         })
         .select()
         .single()

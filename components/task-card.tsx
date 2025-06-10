@@ -74,17 +74,30 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
   const subtasks = task.subtasks || []
   const completedSubtasks = subtasks.filter((st) => st.completed).length
   const tags = task.tags || []
+  const dragInstructionsId = `drag-handle-instructions-${task.id}`; // Unique ID for instructions
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      aria-roledescription="draggable task" // Added for the draggable element
+    >
       <Card className="task-card border-0 bg-card shadow-sm hover:shadow-md">
         <div className="p-4">
           <div className="flex items-start gap-3">
-            <div className="cursor-grab active:cursor-grabbing">
+            <div
+              className="cursor-grab active:cursor-grabbing"
+              aria-describedby={dragInstructionsId} // Added for drag handle
+            >
               <GripVertical className="h-5 w-5 text-muted-foreground" />
             </div>
 
             <div className="flex-1 min-w-0 flex items-start justify-between">
+              {/* Visually hidden instructions for screen readers */}
+              <span id={dragInstructionsId} className="sr-only">
+                Press space to lift, arrow keys to move, space to drop, escape to cancel.
+              </span>
               <div className="flex items-center gap-2">
                 <Checkbox
                   checked={task.completed}

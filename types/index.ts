@@ -9,11 +9,13 @@ export interface Task {
   speed_score?: number
   importance_score?: number
   emoji?: string
-  order_index: number
+  order_index: string | null // Changed from number to string | null for fractional indexing
   created_at: string
   updated_at: string
-  subtasks?: Subtask[]
-  tags?: Tag[]
+  subtasks?: Subtask[] // Full subtask objects for detailed view
+  tags?: Tag[]       // Full tag objects for detailed view
+  subtask_count?: number // Count for list view
+  tag_count?: number     // Count for list view
 }
 
 export interface Subtask {
