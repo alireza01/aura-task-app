@@ -1,65 +1,77 @@
+// components/settings/theme-selector.tsx
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+// import { createClient } from "@/lib/supabase/client" // Remove if not used for reading
 import type { User } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/use-toast"
+// import { useToast } from "@/components/ui/use-toast"; // Ensure useToast is imported if you use it for API errors - Sonner is used instead
+import { toast as sonnerToast } from "sonner"; // Using sonner for consistency if project uses it
 import { motion } from "framer-motion"
 import { Palette, Moon, Sun, Sparkles } from "lucide-react"
 import type { UserSettings, GuestUser } from "@/types"
-import { useDebounce } from "@/hooks/use-debounce"
+// import { useDebounce } from "@/hooks/use-debounce" // Likely not needed anymore for theme saving
 import { useTheme } from "@/components/theme/theme-provider"
 
 interface ThemeSelectorProps {
   user: User | GuestUser | null
-  settings: UserSettings | null
+  settings: UserSettings | null // This might become less directly relevant for theme if fetched by ThemeProvider
   onSettingsChange: () => void
 }
 
 export default function ThemeSelector({ user, settings, onSettingsChange }: ThemeSelectorProps) {
-  const { theme, setTheme } = useTheme()
-  // Initialize selectedTheme with the theme from context, update if settings prop changes.
-  const [selectedTheme, setSelectedTheme] = useState<string>(theme)
-  const { toast } = useToast() // Retain toast for other potential uses or remove if not used elsewhere
-  const [supabase] = useState(() => createClient())
+  const { theme, setTheme } = useTheme();
+  const [selectedTheme, setSelectedTheme] = useState<string>(theme); // Initialize with context theme
+  // const { toast } = useToast(); // Sonner is used instead
+  // const [supabase] = useState(() => createClient()) // Remove if not used for other operations
 
   useEffect(() => {
-    // Reflect theme from useTheme context
-    setSelectedTheme(theme)
-  }, [theme])
+    setSelectedTheme(theme);
+  }, [theme]);
 
+  // This useEffect might be simplified or removed if ThemeProvider handles initial load from DB
   useEffect(() => {
-    // If initial settings are provided, they might override the context theme initially
-    // or update if settings prop changes externally.
-    if (settings) {
-      setSelectedTheme(settings.theme || "default")
+    if (settings?.theme && settings.theme !== selectedTheme) {
+      // This could cause a loop if not handled carefully with ThemeProvider's own loading.
+      // It's generally better for ThemeProvider to be the source of truth after initial load.
+      // setSelectedTheme(settings.theme); // Let's rely on theme from context primarily
     }
-  }, [settings])
+  }, [settings?.theme, selectedTheme]); // Added selectedTheme to dependency array
 
-  useEffect(() => {
-    if (user && !('isGuest' in user) && settings?.theme !== theme && theme) {
-      const saveTheme = async () => {
-        await supabase
-          .from("user_settings")
-          .upsert({
-            user_id: user.id,
-            theme: theme,
-            updated_at: new Date().toISOString(),
-          })
-      };
-      saveTheme();
+
+  const handleThemeChange = async (newThemeValue: string) => {
+    const newTheme = newThemeValue as "default" | "alireza" | "neda"; // Ensure type safety
+    setSelectedTheme(newTheme); // Update local UI immediately
+    setTheme(newTheme); // Update context, ThemeProvider will apply it visually
+
+    if (user && !('isGuest' in user)) {
+      try {
+        const response = await fetch("/api/user/theme", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ theme: newTheme }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to save theme");
+        }
+        // Optionally, show a success toast, though might be too noisy for theme changes
+        // sonnerToast.success("Theme saved to your profile!");
+      } catch (error) {
+        console.error("Error saving theme preference:", error);
+        sonnerToast.error("خطا در ذخیره پوسته", {
+          description: (error as Error).message || "Could not save theme to your profile.",
+        });
+      }
     }
-  }, [theme, user, settings, supabase]);
 
-  const handleThemeChange = (newThemeValue: string) => {
-    const newTheme = newThemeValue as "default" | "alireza" | "neda" // Cast to Theme type
-    setSelectedTheme(newTheme) // Update local state for UI responsiveness
-    setTheme(newTheme) // Update theme in context, ThemeProvider handles saving
-    onSettingsChange() // Callback for parent component
-  }
+    onSettingsChange(); // Notify parent if needed
+  };
 
   const themes = [
     {
@@ -67,7 +79,7 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
       name: "سیاه و سفید (پیش‌فرض)",
       description: "تم کلاسیک با رنگ‌های سیاه و سفید",
       icon: <Sun className="h-5 w-5" />,
-      preview: "bg-white border-gray-200",
+      preview: "bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700", // Added dark mode preview
     },
     {
       id: "alireza",
@@ -83,7 +95,7 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
       icon: <Sparkles className="h-5 w-5" />,
       preview: "bg-neda-main border-neda-accent",
     },
-  ]
+  ];
 
   return (
     <Card className="glass-card border-0">
@@ -105,17 +117,18 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
                   flex items-center space-x-2 space-x-reverse rounded-lg border p-4 cursor-pointer transition-all duration-300
                   ${selectedTheme === themeOption.id ? "border-primary bg-primary/5 shadow-lg" : "border-border hover:border-primary/50"}
                 `}
+                onClick={() => handleThemeChange(themeOption.id)} // Allow clicking the whole div
               >
                 <RadioGroupItem
                   value={themeOption.id}
                   id={themeOption.id}
-                  className="sr-only"
+                  className="sr-only" // Visually hidden, but accessible
                   aria-label={themeOption.name}
                 />
-
-                {/* Theme Preview */}
+                 {/* Theme Preview */}
                 <div
                   className={`flex h-12 w-12 items-center justify-center rounded-lg ${themeOption.preview} transition-all duration-300`}
+                  aria-hidden="true" // Decorative
                 >
                   {themeOption.icon}
                 </div>
@@ -131,7 +144,8 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-primary"
+                    className="absolute left-4 rtl:right-4 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-primary"
+                    aria-hidden="true"
                   />
                 )}
               </motion.div>
@@ -140,5 +154,5 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
         </RadioGroup>
       </CardContent>
     </Card>
-  )
+  );
 }

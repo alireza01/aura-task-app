@@ -13,39 +13,45 @@ interface ApiKeySetupTriggerProps {
 export default function ApiKeySetupTrigger({ user, onApiKeySet }: ApiKeySetupTriggerProps) {
   const [showModal, setShowModal] = useState(false)
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
-  const supabaseClient = createClient()
+  // const supabaseClient = createClient() // Direct Supabase client usage removed
 
   useEffect(() => {
-    checkApiKeyStatus()
-  }, [user, supabaseClient])
-
-  const checkApiKeyStatus = async () => {
-    try {
-      // Check if user has API key in settings
-      const { data: settings } = await supabaseClient
-        .from("user_settings")
-        .select("gemini_api_key")
-        .eq("user_id", user.id)
-        .single()
-
-      const hasKey = !!settings?.gemini_api_key
-      setHasApiKey(hasKey)
-
-      // Check if user has skipped setup
-      const hasSkipped = localStorage.getItem("aura-task-api-key-setup-skipped") === "true"
-
-      // Show modal if no API key and hasn't skipped
-      if (!hasKey && !hasSkipped) {
-        // Small delay to ensure smooth UX after login
-        setTimeout(() => {
-          setShowModal(true)
-        }, 1000)
+    const checkApiKeyStatus = async () => {
+      if (!user) {
+        setHasApiKey(false); // No user, no API key
+        return;
       }
-    } catch (error) {
-      console.error("Error checking API key status:", error)
-      setHasApiKey(false)
-    }
-  }
+      try {
+        // Check API key status via the API route
+        const response = await fetch("/api/user/api-key"); // Ensure this is the correct endpoint for GET status
+        let keyExists = false;
+        if (response.ok) {
+          const data = await response.json();
+          keyExists = data.hasApiKey;
+        } else {
+          console.error("Failed to fetch API key status:", response.statusText);
+          // Assume no key if status check fails, or handle error more gracefully
+        }
+        setHasApiKey(keyExists);
+
+        // Check if user has skipped setup
+        const hasSkipped = localStorage.getItem("aura-task-api-key-setup-skipped") === "true";
+
+        // Show modal if no API key and hasn't skipped
+        if (!keyExists && !hasSkipped) {
+          // Small delay to ensure smooth UX after login
+          setTimeout(() => {
+            setShowModal(true);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error("Error checking API key status:", error);
+        setHasApiKey(false); // Assume no key on error
+      }
+    };
+
+    checkApiKeyStatus()
+  }, [user])
 
   const handleApiKeySet = () => {
     setHasApiKey(true)

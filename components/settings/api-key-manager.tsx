@@ -27,17 +27,41 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
   const [loading, setLoading] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
+  const [hasApiKeyInitially, setHasApiKeyInitially] = useState(false);
   const { toast } = useToast()
-  const supabaseClient = createClient()
+  // const supabaseClient = createClient() // Supabase client direct usage removed
 
   useEffect(() => {
-    if (settings?.gemini_api_key) {
-      // Show masked API key if it exists
-      setApiKey("••••••••••••••••••••••••••••••")
-    } else {
-      setApiKey("")
-    }
-  }, [settings])
+    const fetchApiKeyStatus = async () => {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const response = await fetch("/api/user/api-key");
+        if (response.ok) {
+          const { hasApiKey } = await response.json();
+          setHasApiKeyInitially(hasApiKey);
+          if (hasApiKey) {
+            setApiKey("••••••••••••••••••••••••••••••");
+          } else {
+            setApiKey("");
+          }
+        } else {
+          // Handle error fetching status, maybe show a toast
+          console.error("Failed to fetch API key status");
+          setApiKey(""); // Assume no key if status check fails
+          setHasApiKeyInitially(false);
+        }
+      } catch (error) {
+        console.error("Error fetching API key status:", error);
+        setApiKey("");
+        setHasApiKeyInitially(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchApiKeyStatus();
+  }, [user]); // Re-fetch if user changes
 
   const handleSaveApiKey = async () => {
     if (!apiKey.trim() || apiKey.includes("•")) {
@@ -76,30 +100,33 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
       setTestResult("success")
       setTesting(false)
 
-      // Save to database
-      if (!supabaseClient) throw new Error("Supabase client not initialized")
-      const { error: dbError } = await supabaseClient.from("user_settings").upsert({
-        user_id: user.id,
-        gemini_api_key: apiKey.trim(),
-        updated_at: new Date().toISOString(),
-      })
+      // Save to database via API route
+      const saveResponse = await fetch("/api/user/api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: apiKey.trim() }),
+      });
 
-      if (dbError) throw dbError
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(errorData.error || "Failed to save API key");
+      }
 
       toast({
         title: "کلید API ذخیره شد",
         description: "کلید API شما با موفقیت ذخیره شد.",
-      })
+      });
 
+      setHasApiKeyInitially(true); // Reflect that a key is now set
       // Mask the API key after saving
       setApiKey("••••••••••••••••••••••••••••••")
       setShowApiKey(false)
       onSettingsChange()
-    } catch (error) {
+    } catch (error: any) {
       console.error("خطا در ذخیره کلید API:", error)
       toast({
         title: "خطا در ذخیره کلید API",
-        description: "مشکلی در ذخیره کلید API رخ داد. لطفاً دوباره تلاش کنید.",
+        description: error.message || "مشکلی در ذخیره کلید API رخ داد. لطفاً دوباره تلاش کنید.",
         variant: "destructive",
       })
     } finally {
@@ -108,37 +135,45 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
   }
 
   const handleClearApiKey = async () => {
-    if (!settings?.gemini_api_key) return
+    if (!hasApiKeyInitially && !apiKey.includes("•")) { // No key to clear from server if it wasn't there initially or just typed
+        setApiKey("");
+        toast({
+            title: "کلید API پاک شد",
+            description: "ورودی کلید API پاک شد.",
+        });
+        return;
+    }
 
-    if (!confirm("آیا مطمئن هستید که می‌خواهید کلید API را حذف کنید؟")) {
+
+    if (!confirm("آیا مطمئن هستید که می‌خواهید کلید API را حذف کنید؟ این عمل غیرقابل بازگشت است.")) {
       return
     }
 
     setLoading(true)
 
     try {
-      if (!supabaseClient) throw new Error("Supabase client not initialized")
-      const { error } = await supabaseClient
-        .from("user_settings")
-        .update({
-          gemini_api_key: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id)
+      const deleteResponse = await fetch("/api/user/api-key", {
+        method: "DELETE",
+      });
 
-      if (error) throw error
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json();
+        throw new Error(errorData.error || "Failed to delete API key");
+      }
 
       setApiKey("")
+      setHasApiKeyInitially(false); // Reflect that key is now cleared
+      setShowApiKey(false);
       toast({
         title: "کلید API حذف شد",
-        description: "کلید API شما با موفقیت حذف شد.",
+        description: "کلید API شما با موفقیت از سرور حذف شد.",
       })
       onSettingsChange()
-    } catch (error) {
+    } catch (error: any) {
       console.error("خطا در حذف کلید API:", error)
       toast({
         title: "خطا در حذف کلید API",
-        description: "مشکلی در حذف کلید API رخ داد. لطفاً دوباره تلاش کنید.",
+        description: error.message || "مشکلی در حذف کلید API رخ داد. لطفاً دوباره تلاش کنید.",
         variant: "destructive",
       })
     } finally {
@@ -147,16 +182,21 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only allow changing if the field doesn't contain bullets (masked)
-    if (!e.target.value.includes("•")) {
-      setApiKey(e.target.value)
-      setTestResult(null)
-    }
+    setApiKey(e.target.value) // Allow direct input
+    setTestResult(null)
+    // If user starts typing in a masked field, we assume they want to change it.
+    // The actual value of apiKey will be what they type.
+    // The hasApiKeyInitially state will tell us if there *was* a key on the server.
   }
 
   const handleClearInput = () => {
     setApiKey("")
     setTestResult(null)
+    // If there was a key on the server, clearing the input locally doesn't remove it from server.
+    // User must click "حذف کلید" for that. If no key was on server, this just clears local input.
+    if (hasApiKeyInitially) {
+        setApiKey("••••••••••••••••••••••••••••••"); // Re-mask if there's a key on server
+    }
   }
 
   return (
@@ -177,9 +217,9 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
               type={showApiKey ? "text" : "password"}
               value={apiKey}
               onChange={handleInputChange}
-              placeholder="کلید API خود را اینجا وارد یا به‌روز کنید"
+              placeholder={hasApiKeyInitially ? "کلید API تنظیم شده است (برای تغییر، کلید جدید وارد کنید)" : "کلید API خود را اینجا وارد کنید"}
               className="pl-10 text-left dir-ltr"
-              disabled={loading}
+              disabled={loading && !testing} // Only disable fully if not in testing phase
             />
             <Button
               type="button"
@@ -187,7 +227,7 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
               size="icon"
               className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7"
               onClick={() => setShowApiKey(!showApiKey)}
-              disabled={!apiKey || loading}
+              disabled={loading || (!apiKey && !hasApiKeyInitially)}
               aria-label={showApiKey ? "پنهان کردن کلید API" : "نمایش کلید API"}
             >
               {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -195,7 +235,7 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
           </div>
         </div>
 
-        {testResult === "success" && (
+        {testResult === "success" && apiKey && !apiKey.includes("•") && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <Alert variant="success" className="bg-green-50 text-green-800 border-green-200">
               <CheckCircle className="h-4 w-4" />
@@ -204,7 +244,7 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
           </motion.div>
         )}
 
-        {testResult === "error" && (
+        {testResult === "error" && apiKey && !apiKey.includes("•") && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -229,14 +269,14 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
         </div>
 
         <div className="flex gap-3 pt-2">
-          {apiKey && apiKey.includes("•") ? (
+          {hasApiKeyInitially || apiKey.includes("•") ? ( // If a key is set on the server OR input is masked
             <>
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClearInput}
+                onClick={() => { setApiKey(""); setShowApiKey(true); setTestResult(null); /* setHasApiKeyInitially(false); */ }} // Clear input to allow new entry
                 className="flex-1"
-                disabled={loading || !apiKey}
+                disabled={loading}
               >
                 وارد کردن کلید جدید
               </Button>
@@ -245,9 +285,9 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
                 variant="destructive"
                 onClick={handleClearApiKey}
                 className="flex-1"
-                disabled={loading || !settings?.gemini_api_key}
+                disabled={loading || !hasApiKeyInitially} // Can only clear from server if it was there
               >
-                حذف کلید
+                حذف کلید از سرور
               </Button>
             </>
           ) : (
@@ -255,11 +295,11 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClearInput}
+                onClick={handleClearInput} // Simple clear for non-server key
                 className="flex-1"
                 disabled={loading || !apiKey}
               >
-                پاک کردن
+                پاک کردن ورودی
               </Button>
               <Button
                 type="button"
@@ -275,7 +315,7 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
                       >
-                        <AlertCircle className="h-4 w-4" />
+                        <AlertCircle className="h-4 w-4" /> {/* Using AlertCircle for loading, consider Loader2 */}
                       </motion.div>
                     </span>
                   </>
