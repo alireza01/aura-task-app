@@ -1,10 +1,8 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
+// Removed createClient, User, UserSettings imports as they are handled by store
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,34 +11,45 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Key, Eye, EyeOff, ExternalLink, AlertCircle, CheckCircle } from "lucide-react"
-import type { UserSettings } from "@/types"
+import { useAppStore } from "@/lib/store" // Import the new Zustand store
 
 interface ApiKeyManagerProps {
-  user: User
-  settings: UserSettings | null
-  onSettingsChange: () => void
+  // user: User // Comes from store
+  // settings: UserSettings | null // Comes from store
+  // onSettingsChange: () => void // Will call store action if needed
 }
 
-export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiKeyManagerProps) {
-  const [apiKey, setApiKey] = useState("")
+export default function ApiKeyManager({}: ApiKeyManagerProps) {
+  const [localApiKeyInput, setLocalApiKeyInput] = useState("")
   const [showApiKey, setShowApiKey] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
+  // const [loading, setLoading] = useState(false) // from store: isLoadingApiKey
+  // const [testing, setTesting] = useState(false) // from store: isTestingApiKey
+  // const [testResult, setTestResult] = useState<"success" | "error" | null>(null) // from store: isApiKeyValid
+
   const { toast } = useToast()
-  const supabaseClient = createClient()
+
+  // Settings state from store
+  const storeApiKey = useAppStore(state => state.apiKey) // Masked or null
+  const isApiKeyValid = useAppStore(state => state.isApiKeyValid)
+  const isLoading = useAppStore(state => state.isLoadingApiKey)
+  const isTesting = useAppStore(state => state.isTestingApiKey)
+  // const userId = useAppStore(state => state.user?.id) // Not directly needed if actions handle user context
+
+  // Actions from store
+  const storeSaveApiKey = useAppStore(state => state.saveApiKey)
+  const storeClearApiKey = useAppStore(state => state.clearApiKey)
+  // const storeTestApiKey = useAppStore(state => state.testApiKey) // saveApiKey calls test internally
 
   useEffect(() => {
-    if (settings?.gemini_api_key) {
-      // Show masked API key if it exists
-      setApiKey("••••••••••••••••••••••••••••••")
+    if (storeApiKey) {
+      setLocalApiKeyInput(storeApiKey) // storeApiKey is already masked or null
     } else {
-      setApiKey("")
+      setLocalApiKeyInput("")
     }
-  }, [settings])
+  }, [storeApiKey])
 
   const handleSaveApiKey = async () => {
-    if (!apiKey.trim() || apiKey.includes("•")) {
+    if (!localApiKeyInput.trim() || localApiKeyInput.includes("•")) {
       toast({
         title: "خطا",
         description: "لطفاً کلید API معتبر وارد کنید",
@@ -49,114 +58,60 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
       return
     }
 
-    setLoading(true)
-    setTestResult(null)
-
-    try {
-      // Test the API key first
-      setTesting(true)
-      const testResponse = await fetch("/api/test-gemini", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKey.trim() }),
-      })
-
-      if (!testResponse.ok) {
-        setTestResult("error")
-        toast({
-          title: "کلید API نامعتبر",
-          description: "کلید API وارد شده معتبر نیست یا با خطا مواجه شد.",
-          variant: "destructive",
-        })
-        setTesting(false)
-        setLoading(false)
-        return
-      }
-
-      setTestResult("success")
-      setTesting(false)
-
-      // Save to database
-      if (!supabaseClient) throw new Error("Supabase client not initialized")
-      const { error: dbError } = await supabaseClient.from("user_settings").upsert({
-        user_id: user.id,
-        gemini_api_key: apiKey.trim(),
-        updated_at: new Date().toISOString(),
-      })
-
-      if (dbError) throw dbError
-
+    const success = await storeSaveApiKey(localApiKeyInput.trim())
+    if (success) {
       toast({
         title: "کلید API ذخیره شد",
         description: "کلید API شما با موفقیت ذخیره شد.",
       })
-
-      // Mask the API key after saving
-      setApiKey("••••••••••••••••••••••••••••••")
+      // localApiKeyInput will be updated by useEffect watching storeApiKey
       setShowApiKey(false)
-      onSettingsChange()
-    } catch (error) {
-      console.error("خطا در ذخیره کلید API:", error)
-      toast({
-        title: "خطا در ذخیره کلید API",
-        description: "مشکلی در ذخیره کلید API رخ داد. لطفاً دوباره تلاش کنید.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+      // onSettingsChange might be replaced by direct store updates or specific refresh action if needed
+      // e.g., useAppStore.getState().loadInitialSettings(userId)
+    } else {
+      // Error toast is handled by observing isApiKeyValid state below, or implicitly if save failed for other reasons
+       toast({
+         title: "خطا در ذخیره کلید API",
+         description: "مشکلی در ذخیره کلید API رخ داد. لطفاً دوباره تلاش کنید.",
+         variant: "destructive",
+       })
     }
   }
 
   const handleClearApiKey = async () => {
-    if (!settings?.gemini_api_key) return
+    // Check if there's actually a key stored (even if masked)
+    if (!storeApiKey) return
 
     if (!confirm("آیا مطمئن هستید که می‌خواهید کلید API را حذف کنید؟")) {
       return
     }
 
-    setLoading(true)
-
-    try {
-      if (!supabaseClient) throw new Error("Supabase client not initialized")
-      const { error } = await supabaseClient
-        .from("user_settings")
-        .update({
-          gemini_api_key: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id)
-
-      if (error) throw error
-
-      setApiKey("")
+    const success = await storeClearApiKey()
+    if (success) {
       toast({
         title: "کلید API حذف شد",
         description: "کلید API شما با موفقیت حذف شد.",
       })
-      onSettingsChange()
-    } catch (error) {
-      console.error("خطا در حذف کلید API:", error)
-      toast({
-        title: "خطا در حذف کلید API",
-        description: "مشکلی در حذف کلید API رخ داد. لطفاً دوباره تلاش کنید.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+      // localApiKeyInput will be updated by useEffect watching storeApiKey
+    } else {
+       toast({
+         title: "خطا در حذف کلید API",
+         description: "مشکلی در حذف کلید API رخ داد. لطفاً دوباره تلاش کنید.",
+         variant: "destructive",
+       })
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only allow changing if the field doesn't contain bullets (masked)
-    if (!e.target.value.includes("•")) {
-      setApiKey(e.target.value)
-      setTestResult(null)
-    }
+    setLocalApiKeyInput(e.target.value)
+    // Reset isApiKeyValid from store if user types. SettingsSlice's saveApiKey will set it.
+    // This is tricky because isApiKeyValid is a store state.
+    // A better approach: saveApiKey action in store should reset isApiKeyValid to null at start.
   }
 
   const handleClearInput = () => {
-    setApiKey("")
-    setTestResult(null)
+    setLocalApiKeyInput("")
+    // Similarly, could reset isApiKeyValid to null here via an action if desired.
   }
 
   return (
@@ -175,11 +130,11 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
             <Input
               id="api-key"
               type={showApiKey ? "text" : "password"}
-              value={apiKey}
+              value={localApiKeyInput}
               onChange={handleInputChange}
               placeholder="کلید API خود را اینجا وارد یا به‌روز کنید"
               className="pl-10 text-left dir-ltr"
-              disabled={loading}
+              disabled={isLoading || isTesting}
             />
             <Button
               type="button"
@@ -187,7 +142,7 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
               size="icon"
               className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7"
               onClick={() => setShowApiKey(!showApiKey)}
-              disabled={!apiKey || loading}
+              disabled={!localApiKeyInput || isLoading || isTesting}
               aria-label={showApiKey ? "پنهان کردن کلید API" : "نمایش کلید API"}
             >
               {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -195,16 +150,16 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
           </div>
         </div>
 
-        {testResult === "success" && (
+        {isApiKeyValid === true && !isTesting && !isLoading && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <Alert variant="success" className="bg-green-50 text-green-800 border-green-200">
               <CheckCircle className="h-4 w-4" />
-              <AlertDescription>کلید API معتبر است و با موفقیت تست شد.</AlertDescription>
+              <AlertDescription>کلید API معتبر است.</AlertDescription>
             </Alert>
           </motion.div>
         )}
 
-        {testResult === "error" && (
+        {isApiKeyValid === false && !isTesting && !isLoading && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -229,14 +184,15 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
         </div>
 
         <div className="flex gap-3 pt-2">
-          {apiKey && apiKey.includes("•") ? (
+          {/* Show "Enter New Key" and "Delete Key" if a key is already stored (masked) */}
+          {storeApiKey && localApiKeyInput.includes("•") ? (
             <>
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClearInput}
+                onClick={handleClearInput} // Clears local input to allow entering a new key
                 className="flex-1"
-                disabled={loading || !apiKey}
+                disabled={isLoading || isTesting}
               >
                 وارد کردن کلید جدید
               </Button>
@@ -245,19 +201,20 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
                 variant="destructive"
                 onClick={handleClearApiKey}
                 className="flex-1"
-                disabled={loading || !settings?.gemini_api_key}
+                disabled={isLoading || isTesting || !storeApiKey} // Disable if no key in store
               >
                 حذف کلید
               </Button>
             </>
           ) : (
+            // Show "Clear" and "Save Key" if user is inputting a new key or field is empty
             <>
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleClearInput}
                 className="flex-1"
-                disabled={loading || !apiKey}
+                disabled={isLoading || isTesting || !localApiKeyInput}
               >
                 پاک کردن
               </Button>
@@ -265,11 +222,11 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
                 type="button"
                 onClick={handleSaveApiKey}
                 className="flex-1"
-                disabled={loading || !apiKey || apiKey.includes("•")}
+                disabled={isLoading || isTesting || !localApiKeyInput || localApiKeyInput.includes("•")}
               >
-                {loading ? (
+                {isLoading || isTesting ? (
                   <>
-                    {testing ? "در حال تست..." : "در حال ذخیره..."}
+                    {isTesting ? "در حال تست..." : "در حال ذخیره..."}
                     <span className="mr-2 inline-block">
                       <motion.div
                         animate={{ rotate: 360 }}

@@ -1,6 +1,7 @@
 import { StoreApi } from 'zustand';
 import { createClient, SupabaseClient } from '@/lib/supabase/client';
-import type { User, UserSettings, UserProfile } from '@/types'; // Assuming UserProfile might be relevant for initial settings load
+import type { User, UserSettings } from '@/types'; // UserProfile not directly used
+import { AppState } from './index'; // Required for AppState type in get()
 
 // Define the state and actions for settings
 export interface SettingsSliceState {
@@ -25,10 +26,11 @@ export interface SettingsSliceState {
 
 export type SettingsSlice = SettingsSliceState;
 
-type SetState = StoreApi<SettingsSlice>['setState'];
-type GetState = StoreApi<SettingsSlice>['getState'];
-
-export const createSettingsSlice = (set: SetState, get: GetState): SettingsSlice => {
+// No longer separate SetState/GetState, use StoreApi<AppState> directly
+export const createSettingsSlice = (
+  set: StoreApi<AppState>['setState'],
+  get: StoreApi<AppState>['getState']
+): SettingsSlice => {
   const supabaseClient: SupabaseClient = createClient();
 
   return {

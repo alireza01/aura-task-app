@@ -1,6 +1,7 @@
 import { StoreApi } from 'zustand';
 import { createClient, SupabaseClient } from '@/lib/supabase/client';
-import type { User, Tag, UserProfile } from '@/types';
+import type { User, Tag } from '@/types'; // UserProfile not used directly
+import { AppState } from './index'; // Required for AppState type in get()
 
 export interface TagsSliceState {
   tags: Tag[];
@@ -19,10 +20,11 @@ export interface TagsSliceState {
 
 export type TagsSlice = TagsSliceState;
 
-type SetState = StoreApi<TagsSlice>['setState'];
-type GetState = StoreApi<TagsSlice>['getState'];
-
-export const createTagsSlice = (set: SetState, get: GetState): TagsSlice => {
+// No longer separate SetState/GetState, use StoreApi<AppState> directly
+export const createTagsSlice = (
+  set: StoreApi<AppState>['setState'],
+  get: StoreApi<AppState>['getState']
+): TagsSlice => {
   const supabaseClient: SupabaseClient = createClient();
 
   return {

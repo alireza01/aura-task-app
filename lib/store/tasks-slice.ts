@@ -1,6 +1,7 @@
 import { StoreApi } from 'zustand';
 import { createClient, SupabaseClient } from '@/lib/supabase/client';
 import type { User, Task, UserProfile } from '@/types';
+import { AppState } from './index'; // Required for AppState type in get()
 import { arrayMove } from '@dnd-kit/sortable';
 import { generateFractionalIndex } from '@/lib/utils';
 
@@ -42,10 +43,11 @@ export interface TasksSliceState {
 
 export type TasksSlice = TasksSliceState;
 
-type SetState = StoreApi<TasksSlice>['setState'];
-type GetState = StoreApi<TasksSlice>['getState'];
-
-export const createTasksSlice = (set: SetState, get: GetState): TasksSlice => {
+// No longer separate SetState/GetState, use StoreApi<AppState> directly
+export const createTasksSlice = (
+  set: StoreApi<AppState>['setState'],
+  get: StoreApi<AppState>['getState']
+): TasksSlice => {
   const supabaseClient = createClient();
 
   return {

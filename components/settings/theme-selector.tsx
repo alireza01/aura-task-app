@@ -1,10 +1,13 @@
 // components/settings/theme-selector.tsx
 "use client";
 
+// components/settings/theme-selector.tsx
+"use client";
+
 import * as React from "react";
 import { Moon, Sun, Save } from "lucide-react";
-import { useThemeStore } from "@/lib/hooks/use-theme-store";
-import { useTheme as useNextTheme } from "next-themes"; // Import useNextTheme
+import { useTheme as useNextTheme } from "next-themes";
+import { useAppStore } from "@/lib/store"; // Import the new Zustand store
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,19 +17,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useAppStore } from "@/lib/hooks/use-app-store"; // To check if user is guest
 
 export function ThemeSelector() {
-  const {
-    theme: currentThemeInStore,
-    setTheme: zustandSetTheme,
-    saveTheme,
-    isSavingTheme
-  } = useThemeStore();
+  const currentThemeInStore = useAppStore(state => state.theme);
+  const isSavingTheme = useAppStore(state => state.isSavingTheme);
+  const zustandSetTheme = useAppStore(state => state.setTheme);
+  const saveThemePreference = useAppStore(state => state.saveThemePreference);
+  const userProfile = useAppStore(state => state.userProfile);
 
+  const isGuest = userProfile?.is_guest;
   const { setTheme: nextThemesSetTheme, resolvedTheme } = useNextTheme();
-  const { user } = useAppStore();
-  const isGuest = user?.is_anonymous;
 
   const handleThemeSelect = (newTheme: string) => {
     zustandSetTheme(newTheme); // Update Zustand state
@@ -63,7 +63,7 @@ export function ThemeSelector() {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => saveTheme(currentThemeInStore)}
+                onClick={() => saveThemePreference(currentThemeInStore)}
                 disabled={isSavingTheme}
                 className="flex items-center gap-2"
               >
@@ -74,7 +74,6 @@ export function ThemeSelector() {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {/* Optional: Display current theme or save status more explicitly here if needed */}
     </div>
   );
 }
