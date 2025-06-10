@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { GuestSessionManager } from '@/components/auth/guest-session-manager'
+import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'
 import { ThemeProvider } from "@/components/theme/theme-provider"
 import { Toaster } from "sonner"
 import "./globals.css"
@@ -33,6 +34,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <GuestSessionManager />
+        <GuestMergeHandler />
         <ThemeProvider defaultTheme="default">
           {children}
           <Toaster richColors position="top-right" />
