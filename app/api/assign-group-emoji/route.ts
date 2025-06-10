@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { groupName } = validation.data;
-    const modelName = "gemini-1.5-flash"; // Or "gemini-2.5-flash-preview-05-20" if preferred
+    const modelName = "gemini-2.5-flash-preview-05-20"; // Or "gemini-2.5-flash-preview-05-20" if preferred
     const fallbackEmoji = "📁";
     let assignedEmoji = fallbackEmoji;
     let success = false;
@@ -77,9 +77,10 @@ export async function POST(request: NextRequest) {
           console.warn(`Assign Group Emoji: Invalid emoji response using ${keyType} key. Response: "${text}"`);
           return false; // Consider invalid response as a failure for this key
         }
-      } catch (apiError: any) {
-        console.warn(`Assign Group Emoji: API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'}):`, apiError.message);
-        if (apiError.message && (apiError.message.includes('API key not valid') || apiError.message.includes('API key is invalid') || apiError.message.includes('quota'))) {
+      } catch (apiError: unknown) {
+        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+        console.warn(`Assign Group Emoji: API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'}):`, errorMessage);
+        if (errorMessage && (errorMessage.includes('API key not valid') || errorMessage.includes('API key is invalid') || errorMessage.includes('quota'))) {
           if (keyType === 'user') {
             console.log("Assign Group Emoji: User API key failed with auth/quota error.");
           }
@@ -136,8 +137,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ emoji: assignedEmoji });
 
-  } catch (error: any) {
-    console.error("Assign Group Emoji: Main error handler:", error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Assign Group Emoji: Main error handler:", errorMessage);
     return NextResponse.json({ emoji: "📁" }); // Fallback emoji
   }
 }

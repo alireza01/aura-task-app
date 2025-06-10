@@ -1,10 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import AdminApiKeyManager from './admin-api-key-manager';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Briefcase, Users, Info, ExternalLink } from 'lucide-react';
 
+// Define AdminStats interface locally
+interface AdminStats {
+  totalRegisteredUsers: number;
+  totalGuestAccounts: number;
+  newSignUps24h: number;
+  aiApiCalls24h: number;
+}
+
 const AdminSettingsSection = () => {
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAdminStats = async () => {
+      setLoadingStats(true);
+      setStatsError(null);
+      try {
+        const response = await fetch('/api/admin/stats');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error: ${response.status}`);
+        }
+        const data: AdminStats = await response.json();
+        setAdminStats(data);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error("Failed to fetch admin stats:", errorMessage);
+        setStatsError(errorMessage);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchAdminStats();
+  }, []);
+
   return (
     <div className="space-y-8">
       <div>
@@ -27,22 +63,32 @@ const AdminSettingsSection = () => {
             <CardDescription>Overview of user activity and registrations.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Total Registered Users:</span>
-              <span className="font-semibold">[Data not yet available]</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Currently Active Guests:</span>
-              <span className="font-semibold">[Data not yet available]</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">New Sign-ups (24h):</span>
-              <span className="font-semibold">[Data not yet available]</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">API Calls (24h):</span>
-              <span className="font-semibold">[Data not yet available]</span>
-            </div>
+            {loadingStats ? (
+              <p className="text-sm text-muted-foreground">Loading statistics...</p>
+            ) : statsError ? (
+              <p className="text-sm text-destructive">Failed to load statistics: {statsError}</p>
+            ) : adminStats ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Registered Users:</span>
+                  <span className="font-semibold">{adminStats.totalRegisteredUsers}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Guest Accounts:</span>
+                  <span className="font-semibold">{adminStats.totalGuestAccounts}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">New Sign-ups (24h):</span>
+                  <span className="font-semibold">{adminStats.newSignUps24h}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">AI API Calls (24h):</span>
+                  <span className="font-semibold">{adminStats.aiApiCalls24h}</span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No statistics data available.</p>
+            )}
           </CardContent>
           <CardFooter>
             <p className="text-xs text-muted-foreground">User statistics are updated periodically.</p>

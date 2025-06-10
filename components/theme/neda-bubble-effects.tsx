@@ -101,5 +101,5 @@ export default function BubbleEffects({ trigger, type = "pop", color = "#BCA9F0"
     }
   }, [trigger, type, color, x, y])
 
-  return <div ref={containerRef} className="fixed inset-0 pointer-events-none z-50" />
+  return <div ref={containerRef} className="fixed inset-0 pointer-events-none z-[var(--z-index-tooltip)]" />
 }

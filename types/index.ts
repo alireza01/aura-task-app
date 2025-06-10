@@ -89,11 +89,12 @@ export type User = {
   updated_at: string
 }
 
-export interface GuestUser {
-  id: string
-  email: string
-  created_at: string
-}
+// Removed GuestUser interface
+// export interface GuestUser {
+//   id: string
+//   email: string
+//   created_at: string
+// }
 
 export interface TaskFormData {
   title: string

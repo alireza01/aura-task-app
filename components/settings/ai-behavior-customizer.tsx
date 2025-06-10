@@ -25,11 +25,13 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
   const [importanceWeight, setImportanceWeight] = useState([50])
   const [autoRanking, setAutoRanking] = useState(true)
   const [autoSubtasks, setAutoSubtasks] = useState(true)
+  const [autoTagging, setAutoTagging] = useState(false) // Added state for autoTagging
   const [loading, setLoading] = useState(false)
   const debouncedSpeedWeight = useDebounce(speedWeight[0], 500)
   const debouncedImportanceWeight = useDebounce(importanceWeight[0], 500)
   const debouncedAutoRanking = useDebounce(autoRanking, 500)
   const debouncedAutoSubtasks = useDebounce(autoSubtasks, 500)
+  const debouncedAutoTagging = useDebounce(autoTagging, 500) // Added debounce for autoTagging
   const { toast } = useToast()
   const supabaseClient = createClient()
 
@@ -39,6 +41,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
       setImportanceWeight([settings.importance_weight || 50])
       setAutoRanking(settings.auto_ranking ?? true)
       setAutoSubtasks(settings.auto_subtasks ?? true)
+      setAutoTagging(settings.auto_tagging ?? false) // Initialize autoTagging
     }
   }, [settings])
 
@@ -52,7 +55,8 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
         debouncedSpeedWeight === settings.speed_weight &&
         debouncedImportanceWeight === settings.importance_weight &&
         debouncedAutoRanking === settings.auto_ranking &&
-        debouncedAutoSubtasks === settings.auto_subtasks
+        debouncedAutoSubtasks === settings.auto_subtasks &&
+        debouncedAutoTagging === settings.auto_tagging // Check autoTagging
       ) {
         return
       }
@@ -67,7 +71,8 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
           importance_weight: debouncedImportanceWeight,
           auto_ranking: debouncedAutoRanking,
           auto_subtasks: debouncedAutoSubtasks,
-          updated_at: new Date().toISOString(),
+          auto_tagging: debouncedAutoTagging, // Save autoTagging
+          updated_at: new Date().toISOString(), // This should be handled by DB trigger, consider removing
         })
 
         if (error) throw error
@@ -91,6 +96,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
     debouncedImportanceWeight,
     debouncedAutoRanking,
     debouncedAutoSubtasks,
+    debouncedAutoTagging, // Add to dependencies
     settings,
     user.id,
     supabaseClient,
@@ -137,6 +143,18 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
               id="auto-subtasks"
               checked={autoSubtasks}
               onCheckedChange={setAutoSubtasks}
+              disabled={loading || !settings?.gemini_api_key}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-purple-500" />
+              <Label htmlFor="auto-tagging">برچسب‌گذاری خودکار</Label>
+            </div>
+            <Switch
+              id="auto-tagging"
+              checked={autoTagging}
+              onCheckedChange={setAutoTagging}
               disabled={loading || !settings?.gemini_api_key}
             />
           </div>

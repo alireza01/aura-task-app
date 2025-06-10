@@ -57,14 +57,17 @@ export default function ApiKeySetup({ onComplete, onSkip }: ApiKeySetupProps) {
       const { error: dbError } = await supabase.from("user_settings").upsert({
         user_id: user.id,
         gemini_api_key: apiKey.trim(),
-        updated_at: new Date().toISOString(),
-      })
+      }, { onConflict: 'user_id' });
 
       if (dbError) throw dbError
 
       onComplete()
-    } catch (error: any) {
-      setError(error.message || "خطا در ذخیره کلید API")
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message || "خطا در ذخیره کلید API");
+      } else {
+        setError("خطا در ذخیره کلید API");
+      }
     } finally {
       setLoading(false)
     }

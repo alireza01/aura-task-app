@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
   auto_subtasks BOOLEAN DEFAULT true,
   auto_tagging BOOLEAN DEFAULT false,
   theme TEXT DEFAULT 'default',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
 );
 
@@ -137,6 +137,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Function to get the count of tags for a specific task
+CREATE OR REPLACE FUNCTION public.get_task_tag_count(p_task_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+  tag_c INTEGER;
+BEGIN
+  SELECT COUNT(*)
+  INTO tag_c
+  FROM public.task_tags
+  WHERE task_id = p_task_id;
+  RETURN tag_c;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
 
 -- 4. Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
@@ -154,7 +168,7 @@ ALTER TABLE public.task_tags ENABLE ROW LEVEL SECURITY;
 -- user_profiles policies
 CREATE POLICY "Users can select their own profile" ON public.user_profiles FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can create their own profile" ON public.user_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own mutable profile data" ON public.user_profiles FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own mutable profile data" ON public.user_profiles FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id AND (NEW.is_guest = OLD.is_guest OR (OLD.is_guest = TRUE AND NEW.is_guest = FALSE)));
 CREATE POLICY "Admins can select all user profiles" ON public.user_profiles FOR SELECT USING (public.is_admin(auth.uid()));
 
 -- admin_api_keys policies
@@ -186,6 +200,37 @@ CREATE POLICY "Admins can select all tags" ON public.tags FOR SELECT USING (publ
 -- task_tags policies
 CREATE POLICY "Users can manage task_tags for their own tasks" ON public.task_tags FOR ALL USING (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = task_tags.task_id AND tasks.user_id = auth.uid()));
 CREATE POLICY "Admins can select all task_tags" ON public.task_tags FOR SELECT USING (public.is_admin(auth.uid()));
+
+-- Create Views
+CREATE OR REPLACE VIEW public.tasks_with_counts AS
+SELECT
+  t.id,
+  t.user_id,
+  t.group_id,
+  t.title,
+  t.description,
+  t.completed,
+  t.completed_at,
+  t.speed_score,
+  t.importance_score,
+  t.emoji,
+  t.order_index,
+  t.created_at,
+  t.updated_at,
+  (SELECT COUNT(*) FROM public.subtasks st WHERE st.task_id = t.id) AS subtask_count,
+  public.get_task_tag_count(t.id) AS tag_count
+FROM
+  public.tasks t;
+
+-- Enable RLS on the view
+-- ALTER VIEW public.tasks_with_counts OWNER TO postgres; -- Owner is automatically the role executing this script, likely postgres or service_role
+ALTER TABLE public.tasks_with_counts ENABLE ROW LEVEL SECURITY;
+
+-- Policy for the view: users can only select tasks they own.
+CREATE POLICY "Users can select their own tasks data via view"
+ON public.tasks_with_counts
+FOR SELECT
+USING (auth.uid() = user_id); -- Assumes user_id from the view's columns
 
 
 -- 6. Create Indexes for performance

@@ -68,13 +68,13 @@ export default function CustomCursor() {
     <>
       <div
         ref={cursorRef}
-        className="fixed top-0 left-0 w-5 h-5 bg-alireza-yellow rounded-full pointer-events-none z-[9999] mix-blend-difference"
+        className="fixed top-0 left-0 w-5 h-5 bg-alireza-yellow rounded-full pointer-events-none z-[var(--z-index-custom-cursor)] mix-blend-difference"
         style={{ transform: "translate(-50%, -50%)" }}
       />
       <div
         ref={followerRef}
-        className="fixed top-0 left-0 w-10 h-10 border-2 border-alireza-yellow rounded-full pointer-events-none z-[9998] opacity-50"
-        style={{ transform: "translate(-50%, -50%)" }}
+        className="fixed top-0 left-0 w-10 h-10 border-2 border-alireza-yellow rounded-full pointer-events-none opacity-50"
+        style={{ transform: "translate(-50%, -50%)", zIndex: "calc(var(--z-index-custom-cursor) - 1)" }}
       />
     </>
   )

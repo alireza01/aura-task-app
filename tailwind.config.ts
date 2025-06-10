@@ -63,15 +63,6 @@ const config = {
           error: "#E53935",
           card: "#1E1E1E",
         },
-        // Neda Theme Colors
-        neda: {
-          main: "#F8F9FA",
-          text: "#2D3748",
-          accent: "#FF6B9D",
-          subtle: "#E2E8F0",
-          muted: "#718096",
-          card: "#FFFFFF",
-        },
       },
       borderRadius: {
         lg: "var(--radius)",

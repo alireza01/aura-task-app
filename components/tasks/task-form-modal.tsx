@@ -10,11 +10,11 @@ import { X, Plus, Edit3 } from "lucide-react"
 import type { Task, TaskGroup, UserSettings, User, GuestUser, Tag } from "@/types"
 import type { TaskFormData } from "@/types"
 import TaskForm from "@/components/tasks/task-form"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+// import { useLocalStorage } from "@/hooks/use-local-storage" // Removed
 
 interface TaskFormModalProps {
   user: User | null
-  guestUser: GuestUser | null
+  // guestUser: GuestUser | null, // Removed
   groups: TaskGroup[]
   tags: Tag[]
   settings: UserSettings | null
@@ -27,7 +27,7 @@ interface TaskFormModalProps {
 
 export default function TaskFormModal({
   user,
-  guestUser,
+  // guestUser, // Removed
   groups,
   tags,
   settings,
@@ -38,7 +38,7 @@ export default function TaskFormModal({
   initialTitle = "",
 }: TaskFormModalProps) {
   const [loading, setLoading] = useState(false)
-  const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
+  // const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", []) // Removed
   const showToast = toast
   const [supabaseClient, setSupabaseClient] = useState<any>(null)
 
@@ -92,19 +92,76 @@ export default function TaskFormModal({
 
           if (taskError) throw taskError
 
-          // Handle subtasks update
-          if (taskData.subtasks && taskData.subtasks.length > 0) {
-            // Delete existing subtasks
-            await supabaseClient.from("subtasks").delete().eq("task_id", taskToEdit!.id)
+          // Granular Subtask Update Logic
+          const newSubtaskTitles = (taskData.subtasks || []).map(st => st.trim());
+          const { data: existingSubtasksData, error: fetchSubtasksError } = await supabaseClient
+            .from("subtasks")
+            .select("id, title, order_index") // Fetched order_index too
+            .eq("task_id", taskToEdit!.id);
 
-            // Insert new subtasks
-            const subtaskInserts = taskData.subtasks.map((subtask: string, index: number) => ({
-              task_id: taskToEdit!.id,
-              title: subtask.trim(),
-              order_index: index,
-            }))
+          if (fetchSubtasksError) throw fetchSubtasksError;
+          const existingSubtasks = existingSubtasksData || [];
 
-            await supabaseClient.from("subtasks").insert(subtaskInserts)
+          const subtasksToDelete = existingSubtasks.filter(dbSt => !newSubtaskTitles.includes(dbSt.title));
+          if (subtasksToDelete.length > 0) {
+            const deleteError = await supabaseClient.from("subtasks").delete().in("id", subtasksToDelete.map(st => st.id));
+            if (deleteError.error) throw deleteError.error;
+          }
+
+          const subtasksToAdd = [];
+          const subtasksToUpdateOrder = [];
+
+          for (let i = 0; i < newSubtaskTitles.length; i++) {
+            const newTitle = newSubtaskTitles[i];
+            const existing = existingSubtasks.find(dbSt => dbSt.title === newTitle);
+            if (existing) {
+              // Check if order_index needs update
+              if (existing.order_index !== i) {
+                subtasksToUpdateOrder.push({ id: existing.id, order_index: i });
+              }
+            } else {
+              subtasksToAdd.push({ task_id: taskToEdit!.id, title: newTitle, order_index: i, completed: false });
+            }
+          }
+
+          if (subtasksToAdd.length > 0) {
+            const { error: insertSubtasksError } = await supabaseClient.from("subtasks").insert(subtasksToAdd);
+            if (insertSubtasksError) throw insertSubtasksError;
+          }
+
+          for (const subtask of subtasksToUpdateOrder) {
+            const { error: updateOrderError } = await supabaseClient
+              .from("subtasks")
+              .update({ order_index: subtask.order_index })
+              .eq("id", subtask.id);
+            if (updateOrderError) throw updateOrderError;
+          }
+
+          // Granular Tag Update Logic
+          const selectedTagIds = taskData.selectedTags || [];
+          const { data: existingTaskTagsData, error: fetchTagsError } = await supabaseClient
+            .from("task_tags")
+            .select("tag_id")
+            .eq("task_id", taskToEdit!.id);
+
+          if (fetchTagsError) throw fetchTagsError;
+          const existingTagIds = (existingTaskTagsData || []).map(ett => ett.tag_id);
+
+          const tagsToDelete = existingTagIds.filter(tagId => !selectedTagIds.includes(tagId));
+          if (tagsToDelete.length > 0) {
+            const { error: deleteTagsError } = await supabaseClient
+              .from("task_tags")
+              .delete()
+              .eq("task_id", taskToEdit!.id)
+              .in("tag_id", tagsToDelete);
+            if (deleteTagsError) throw deleteTagsError;
+          }
+
+          const tagsToAdd = selectedTagIds.filter(tagId => !existingTagIds.includes(tagId));
+          if (tagsToAdd.length > 0) {
+            const tagInserts = tagsToAdd.map(tagId => ({ task_id: taskToEdit!.id, tag_id: tagId }));
+            const { error: insertTagsError } = await supabaseClient.from("task_tags").insert(tagInserts);
+            if (insertTagsError) throw insertTagsError;
           }
 
           showToast("وظیفه به‌روزرسانی شد", {
@@ -145,77 +202,33 @@ export default function TaskFormModal({
           })
         }
       } else {
-        // Save to local storage
-        if (isEditMode) {
-          const updatedTasks = localTasks.map((task: Task) =>
-            task.id === taskToEdit!.id
-              ? ({
-                  ...task,
-                  title: taskData.title,
-                  description: taskData.description || undefined,
-                  group_id: taskData.groupId || null,
-                  speed_score: taskData.speedScore,
-                  importance_score: taskData.importanceScore,
-                  emoji: taskData.emoji,
-                  updated_at: new Date().toISOString(),
-                  subtasks:
-                    taskData.subtasks?.map((title: string, index: number) => ({
-                      id: `${Date.now()}-${index}`,
-                      task_id: taskToEdit!.id,
-                      title: title.trim(),
-                      completed: false,
-                      order_index: index,
-                      created_at: new Date().toISOString(),
-                    })) || [],
-                  tags: tags.filter((tag) => taskData.selectedTags.includes(tag.id)),
-                } as Task)
-              : task,
-          )
-          setLocalTasks(updatedTasks)
-
-          showToast("وظیفه به‌روزرسانی شد", {
-            description: "تغییرات در حافظه محلی ذخیره شد.",
-          })
-        } else {
-          const newTask: Task = {
-            id: Date.now().toString(),
-            user_id: guestUser?.id || "guest",
-            title: taskData.title,
-            description: taskData.description || undefined,
-            group_id: taskData.groupId || null,
-            speed_score: taskData.speedScore,
-            importance_score: taskData.importanceScore,
-            emoji: taskData.emoji,
-            order_index: localTasks.length,
-            completed: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            subtasks:
-              taskData.subtasks?.map((title: string, index: number) => ({
-                id: `${Date.now()}-${index}`,
-                task_id: Date.now().toString(),
-                title: title.trim(),
-                completed: false,
-                order_index: index,
-                created_at: new Date().toISOString(),
-              })) || [],
-            tags: tags.filter((tag) => taskData.selectedTags.includes(tag.id)),
-          }
-
-          setLocalTasks([...localTasks, newTask])
-
-          showToast("وظیفه ایجاد شد", {
-            description: "وظیفه جدید در حافظه محلی ذخیره شد.",
-          })
-        }
+        // This 'else' block was for local storage operations when user is not available (e.g. guestUser)
+        // Since we are removing guestUser and localTasks, this block should be removed.
+        // If there's no 'user' (Supabase user, including anonymous), we should not attempt to save.
+        // Or, this path should ideally not be hit if AppInitializer ensures a user (anonymous or real) always exists.
+        console.warn("Attempted to save task without a user session. This should not happen.");
+        showToast("خطا: کاربر نامعتبر", {
+          description: "برای ذخیره وظیفه، لطفاً ابتدا وارد شوید یا از حالت مهمان استفاده کنید.",
+          duration: 5000,
+          className: "bg-red-500 text-white",
+        });
+        // Early exit if no user, to prevent calling onTaskSaved() etc. for a failed operation.
+        setLoading(false);
+        return;
       }
 
       onTaskSaved()
       onClose()
-    } catch (error) {
-      console.error("خطا در ذخیره وظیفه:", error)
+    } catch (error: unknown) {
+      console.error("خطا در ذخیره وظیفه:", error);
+      let errorMessage = "مشکلی در ذخیره وظیفه رخ داد. لطفاً دوباره تلاش کنید.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
       showToast("خطا در ذخیره وظیفه", {
-        description: "مشکلی در ذخیره وظیفه رخ داد. لطفاً دوباره تلاش کنید.",
+        description: errorMessage,
         duration: 3000,
         className: "bg-red-500 text-white",
       })
@@ -254,7 +267,7 @@ export default function TaskFormModal({
             >
               <TaskForm
                 user={user}
-                guestUser={guestUser}
+                // guestUser={guestUser} // Removed
                 groups={groups}
                 tags={tags}
                 settings={settings}

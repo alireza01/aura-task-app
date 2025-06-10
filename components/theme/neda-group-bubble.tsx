@@ -14,7 +14,7 @@ interface NedaGroupBubbleProps {
   isSelected: boolean
   taskCount: number
   onClick: () => void
-  onDelete?: () => void
+  onDeleteRequest?: (group: TaskGroup) => void // Changed from onDelete
   onDragOver?: (e: React.DragEvent) => void
   onDragLeave?: () => void
   onDrop?: (e: React.DragEvent) => void
@@ -26,7 +26,7 @@ export default function NedaGroupBubble({
   isSelected,
   taskCount,
   onClick,
-  onDelete,
+  onDeleteRequest, // Changed from onDelete
   onDragOver,
   onDragLeave,
   onDrop,
@@ -117,7 +117,7 @@ export default function NedaGroupBubble({
           onComplete: () => {
             setShowDeleteEffect(true)
             setTimeout(() => {
-              onDelete?.()
+              onDeleteRequest?.(group) // Changed from onDelete
             }, 100)
           },
         })
@@ -182,7 +182,7 @@ export default function NedaGroupBubble({
         </div>
 
         {/* Delete button (appears on hover) */}
-        {onDelete && (
+        {onDeleteRequest && ( // Changed from onDelete
           <motion.button
             type="button"
             onClick={(e) => {

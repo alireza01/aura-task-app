@@ -11,7 +11,7 @@ const createApiKeySchema = z.object({
 });
 
 // Helper function to check if user is admin
-async function isAdmin(supabase: SupabaseClient<Database>) {
+async function isAdmin(supabase: SupabaseClient<Database>): Promise<boolean> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     console.error('Auth error or no user:', userError);
@@ -50,9 +50,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message || 'Failed to fetch API keys' }, { status: 500 });
     }
     return NextResponse.json(data);
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error in GET /api/admin/api-keys:', e);
-    return NextResponse.json({ error: e.message || 'An unexpected error occurred' }, { status: 500 });
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: errorMessage || 'An unexpected error occurred' }, { status: 500 });
   }
 }
 
@@ -89,12 +90,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(data, { status: 201 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error in POST /api/admin/api-keys:', e);
     // Check if it's a JSON parsing error
-    if (e instanceof SyntaxError) {
+    if (e instanceof SyntaxError) { // SyntaxError is a specific type of Error
         return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
     }
-    return NextResponse.json({ error: e.message || 'An unexpected error occurred' }, { status: 500 });
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: errorMessage || 'An unexpected error occurred' }, { status: 500 });
   }
 }

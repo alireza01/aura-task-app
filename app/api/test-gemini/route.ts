@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"; // HarmCategory, HarmBlockThreshold removed as not used
 import { z } from "zod";
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 const testGeminiSchema = z.object({
@@ -9,8 +9,8 @@ const testGeminiSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  // const cookieStore = cookies(); // Not needed if createClient() handles it
+  const supabase = createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-preview-0520", // Using the same model as process-task
+      model: "gemini-2.5-flash-preview-05-20", // Using the same model as process-task
       // Default safety settings are usually fine for a simple "Hello"
     });
 

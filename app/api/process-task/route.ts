@@ -9,7 +9,6 @@ const processTaskSchema = z.object({
   description: z.string().optional(),
   autoRanking: z.boolean().optional(),
   autoSubtasks: z.boolean().optional(),
-  // userId: z.string().uuid(), // Removed from schema
 });
 
 export async function POST(request: NextRequest) {
@@ -35,10 +34,10 @@ export async function POST(request: NextRequest) {
     // userId is now obtained from session, not from body
     const { title, description, autoRanking, autoSubtasks } = validation.data;
 
-    // 1. Fetch User Settings (includes API key and weights)
+    // 1. Fetch User Settings (includes API key, weights, and auto_tagging)
     const { data: settings, error: settingsError } = await supabase
       .from("user_settings")
-      .select("gemini_api_key, speed_weight, importance_weight")
+      .select("gemini_api_key, speed_weight, importance_weight, auto_tagging") // Added auto_tagging
       .eq("user_id", userId)
       .single();
 
@@ -56,9 +55,12 @@ export async function POST(request: NextRequest) {
       importanceScore: settings?.importance_weight ? Math.round(settings.importance_weight / 5) : 10,
       emoji: "📝",
       subtasks: [],
+      tags: [], // Added tags to defaultResult
     };
 
-    if (!autoRanking && !autoSubtasks) {
+    // Check if any AI feature is enabled (autoRanking, autoSubtasks from body, auto_tagging from settings)
+    const autoTaggingEnabled = settings?.auto_tagging ?? false;
+    if (!autoRanking && !autoSubtasks && !autoTaggingEnabled) {
       return NextResponse.json(defaultResult);
     }
 
@@ -81,6 +83,9 @@ export async function POST(request: NextRequest) {
 
     if (autoSubtasks) {
       prompt += ',\n  "subtasks": ["فهرست زیروظایف قابل اجرا - حداکثر 5 مورد"]'
+    }
+    if (autoTaggingEnabled) { // Use autoTaggingEnabled from settings
+      prompt += ',\n  "tags": ["فهرست رشته‌ای از برچسب‌های مرتبط و مفید برای این وظیفه - حداکثر 3 برچسب مرتبط با موضوع وظیفه"]'
     }
 
     prompt += "\n}"
@@ -114,6 +119,7 @@ export async function POST(request: NextRequest) {
               importanceScore: aiResult.importanceScore === undefined && !autoRanking ? defaultResult.importanceScore : (aiResult.importanceScore ?? defaultResult.importanceScore),
               emoji: aiResult.emoji || defaultResult.emoji,
               subtasks: aiResult.subtasks || defaultResult.subtasks,
+              tags: autoTaggingEnabled ? (aiResult.tags || []) : [], // Process tags if autoTaggingEnabled
             };
             if (result.speedScore < 1) result.speedScore = 1; if (result.speedScore > 20) result.speedScore = 20;
             if (result.importanceScore < 1) result.importanceScore = 1; if (result.importanceScore > 20) result.importanceScore = 20;
@@ -133,9 +139,10 @@ export async function POST(request: NextRequest) {
           console.warn(`AI response text was empty using ${keyType} key.`);
           throw new Error("AI response text was empty."); // Treat as failure for this key
         }
-      } catch (apiError: any) {
-        console.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'}):`, apiError.message);
-        if (apiError.message && (apiError.message.includes('API key not valid') || apiError.message.includes('API key is invalid') || apiError.message.includes('quota'))) {
+      } catch (apiError: unknown) {
+        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+        console.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'}):`, errorMessage);
+        if (errorMessage && (errorMessage.includes('API key not valid') || errorMessage.includes('API key is invalid') || errorMessage.includes('quota'))) {
           if (keyType === 'user') {
             console.log("User API key failed with auth/quota error. Will attempt admin keys.");
             attemptUserKey = false; // Mark that user key failed due to auth, so we don't use it again (for this request)
@@ -155,15 +162,16 @@ export async function POST(request: NextRequest) {
     if (userApiKey && attemptUserKey) {
       try {
         success = await attemptApiCall(userApiKey, 'user');
-      } catch (error: any) { // Catch errors re-thrown by attemptApiCall if they are non-auth related
-        console.error(`AI processing failed with user key due to non-auth error: ${error.message}`);
+      } catch (error: unknown) { // Catch errors re-thrown by attemptApiCall if they are non-auth related
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`AI processing failed with user key due to non-auth error: ${errorMessage}`);
         // If error is safety related or other non-key specific issue
-        if (error.message && error.message.includes('SAFETY')) {
-          return NextResponse.json({ error: "Content blocked due to safety settings.", details: error.message }, { status: 400 });
+        if (errorMessage && errorMessage.includes('SAFETY')) {
+          return NextResponse.json({ error: "Content blocked due to safety settings.", details: errorMessage }, { status: 400 });
         }
         // For other non-auth errors with user key, we might not want to try admin keys.
         // For now, we will stop if user key fails with a non-auth error.
-        return NextResponse.json({ error: "AI processing failed with user API key.", details: error.message }, { status: 500 });
+        return NextResponse.json({ error: "AI processing failed with user API key.", details: errorMessage }, { status: 500 });
       }
     }
 
@@ -188,29 +196,31 @@ export async function POST(request: NextRequest) {
           try {
             success = await attemptApiCall(adminKey.api_key, 'admin', adminKey.id);
             if (success) break;
-          } catch (error: any) { // Catch errors re-thrown by attemptApiCall if they are non-auth related for an admin key
-             console.error(`AI processing failed with admin key ${adminKey.id} due to non-auth error: ${error.message}`);
-             if (error.message && error.message.includes('SAFETY')) {
-               return NextResponse.json({ error: "Content blocked due to safety settings.", details: error.message }, { status: 400 });
+          } catch (error: unknown) { // Catch errors re-thrown by attemptApiCall if they are non-auth related for an admin key
+             const errorMessage = error instanceof Error ? error.message : String(error);
+             console.error(`AI processing failed with admin key ${adminKey.id} due to non-auth error: ${errorMessage}`);
+             if (errorMessage && errorMessage.includes('SAFETY')) {
+               return NextResponse.json({ error: "Content blocked due to safety settings.", details: errorMessage }, { status: 400 });
              }
              // If one admin key fails with a non-auth error, it's likely others will too. Stop.
-             return NextResponse.json({ error: "AI processing failed with an admin API key.", details: error.message }, { status: 500 });
+             return NextResponse.json({ error: "AI processing failed with an admin API key.", details: errorMessage }, { status: 500 });
           }
         }
       }
     }
 
-    if (!success && (autoRanking || autoSubtasks)) {
-      console.error("All API key attempts (user and admin) failed or no keys available.");
-      return NextResponse.json({ error: "Unable to process the request using AI at the moment. No working API key found or all attempts failed." }, { status: 503 });
+    if (!success && (autoRanking || autoSubtasks || autoTaggingEnabled)) { // Check autoTaggingEnabled here too
+      console.error("All API key attempts (user and admin) failed or no keys available for enabled AI features.");
+      return NextResponse.json({ error: "Unable to process the request using AI at the moment. No working API key found or all attempts failed for enabled AI features." }, { status: 503 });
     } else if (!success) {
       // AI features were not critical, or no AI features requested, and no success (though this path should be covered by early exit)
       result = defaultResult; // Fallback to default if AI processing was desired but failed, and it's not critical enough to error out
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error("Error processing task:", error)
-    return NextResponse.json({ error: error.message || "Failed to process task" }, { status: 500 })
+  } catch (error: unknown) {
+    console.error("Error processing task:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: errorMessage || "Failed to process task" }, { status: 500 });
   }
 }
