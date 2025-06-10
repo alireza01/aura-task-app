@@ -4,8 +4,7 @@ import type { Metadata } from "next"
 import { GuestSessionManager } from '@/components/auth/guest-session-manager'
 import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'
 import { ThemeProvider } from "@/components/theme/theme-provider"
-import { Toaster } from "sonner"
-import { SupabaseProvider } from "@/components/auth/supabase-provider" // <-- IMPORT
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -40,14 +39,12 @@ export default function RootLayout({
             though useUser is the one causing the immediate error.
             Let's place them inside for consistency.
         */}
-        <SupabaseProvider> {/* <-- WRAPPER START */}
+        <ThemeProvider defaultTheme="default">
           <GuestSessionManager />
           <GuestMergeHandler />
-          <ThemeProvider defaultTheme="default">
-            {children}
-            <Toaster richColors position="top-right" />
-          </ThemeProvider>
-        </SupabaseProvider> {/* <-- WRAPPER END */}
+          {children}
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   )

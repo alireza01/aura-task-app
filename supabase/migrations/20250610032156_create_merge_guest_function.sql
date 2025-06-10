@@ -23,6 +23,7 @@ begin
   update public.tasks set user_id = permanent_user_id where user_id = guest_user_id;
   update public.task_groups set user_id = permanent_user_id where user_id = guest_user_id;
   update public.tags set user_id = permanent_user_id where user_id = guest_user_id;
+  update public.user_settings set user_id = permanent_user_id where user_id = guest_user_id;
   -- ... add more tables as needed (e.g., settings, etc.)
 
   -- After merging, delete the old guest profile.
