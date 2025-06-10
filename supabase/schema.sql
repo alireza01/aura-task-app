@@ -116,6 +116,13 @@ ALTER TABLE task_tags ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can select their own profile" ON user_profiles
   FOR SELECT USING (auth.uid() = user_id);
 
+-- Policy for users to create their own profile (e.g., for guest user setup)
+DROP POLICY IF EXISTS "Users can create their own profile." ON public.user_profiles;
+CREATE POLICY "Users can create their own profile."
+ON public.user_profiles
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
 -- Policy for users to update mutable parts of their profile like nickname
 CREATE POLICY "Users can update their own mutable profile data" ON public.user_profiles
   FOR UPDATE USING (auth.uid() = user_id)
