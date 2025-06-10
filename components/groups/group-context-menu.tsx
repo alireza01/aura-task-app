@@ -14,7 +14,6 @@ import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
 import GroupFormModal from "./group-form-modal"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { useLocalStorage } from "@/hooks/use-local-storage"
 
 interface GroupContextMenuProps {
   group: TaskGroup
@@ -35,12 +34,11 @@ export default function GroupContextMenu({
 }: GroupContextMenuProps) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [loading, setLoading] = useState(false)
-  // localTasks is kept for taskCount as per instructions, though ideally this count should come from Supabase.
-  const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
   const showToast = toast
   const supabase = createClient() // Initialize Supabase client directly
 
   const handleDeleteGroup = async () => {
+    // The taskCount prop is used here directly.
     if (taskCount > 0) {
       showToast("امکان حذف گروه وجود ندارد", {
         description: "ابتدا تمام وظایف این گروه را حذف یا به گروه دیگری منتقل کنید.",
