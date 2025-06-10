@@ -3,7 +3,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useUser } from '@/hooks/useUser' // Assuming you have a hook to get user data
+import { useUser } from '@supabase/auth-helpers-nextjs'
 import { mergeGuestAccount } from '@/lib/auth/actions'
 
 export function GuestMergeHandler() {
