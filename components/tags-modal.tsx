@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react" // useEffect removed as it's not used
+import { supabase as supabaseClient } from "@/lib/supabase/client" // Changed import and aliased
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,7 +38,7 @@ export default function TagsModal({ user, tags, onClose, onTagsChange }: TagsMod
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [loading, setLoading] = useState(false)
   const showToast = toast
-  const supabaseClient = createClient()
+  // const supabaseClient = createClient() // Removed, use imported supabaseClient directly
 
   const handleAddTag = async (e: React.FormEvent) => {
     e.preventDefault()

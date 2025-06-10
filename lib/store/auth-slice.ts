@@ -1,6 +1,7 @@
 import { StoreApi } from 'zustand';
 import type { User, UserProfile } from '@/types';
-import { SupabaseClient, createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client'; // Changed import
+import type { SupabaseClient } from '@supabase/supabase-js'; // Added type import
 import { AppState } from './index'; // Required for AppState type in get()
 
 export interface AuthSliceState {
@@ -27,7 +28,8 @@ export const createAuthSlice = (
   set: StoreApi<AppState>['setState'],
   get: StoreApi<AppState>['getState']
 ): AuthSlice => {
-  const supabase: SupabaseClient = createClient();
+  // const supabase: SupabaseClient = createClient(); // Removed, use imported supabase directly
+  // Ensure the imported supabase instance is typed as SupabaseClient if needed, though it should be.
 
   return {
     // Initial State

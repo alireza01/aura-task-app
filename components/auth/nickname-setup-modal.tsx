@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client'; // Changed import
 
 interface NicknameSetupModalProps {
   isOpen: boolean;
@@ -33,7 +33,7 @@ export default function NicknameSetupModal({
   const [nickname, setNickname] = useState(currentNickname || "");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const supabase = createClient();
+  // const supabase = createClient(); // Removed, use imported supabase directly
 
   useEffect(() => {
     // Update nickname in state if the prop changes (e.g. profile reloaded)

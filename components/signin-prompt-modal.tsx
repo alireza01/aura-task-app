@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react" // useEffect removed as it's not used
+import { supabase as supabaseClient } from "@/lib/supabase/client" // Changed import and aliased
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,13 +15,13 @@ interface SignInPromptModalProps {
 
 export default function SignInPromptModal({ onClose, onSignIn }: SignInPromptModalProps) {
   const [loading, setLoading] = useState(false)
-  const supabaseClient = createClient()
+  // const supabaseClient = createClient() // Removed, use imported supabaseClient directly
 
   const handleSignIn = async () => {
-    if (!supabaseClient) return
+    // if (!supabaseClient) return; // Check imported instance if needed
     setLoading(true)
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser();
+      const { data: { user } } = await supabaseClient.auth.getUser(); // Use imported instance
 
       if (user?.is_anonymous) {
         console.log('Linking anonymous user with Google');

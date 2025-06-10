@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react" // useEffect removed as it's not used
+import { supabase as supabaseClient } from "@/lib/supabase/client" // Changed import and aliased
 import { Button } from "@/components/ui/button"
 import type { TaskGroup, User } from "@/types"
 import { Plus } from "lucide-react"
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { toast } from "sonner"
-import { useTheme } from "@/components/theme/theme-provider"
+import { useAppStore } from '@/lib/store'; // Added Zustand store import
 import GroupFormModal from "./groups/group-form-modal"
 import GroupContextMenu from "./groups/group-context-menu"
 import NedaGroupBubble from "./theme/neda-group-bubble"
@@ -41,8 +41,8 @@ export default function TaskGroupsBubbles({
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false); // Added state
   const [groupToDelete, setGroupToDelete] = useState<TaskGroup | null>(null); // Added state
   const showToast = toast
-  const { theme } = useTheme()
-  const supabaseClient = createClient() // Initialize Supabase client directly
+  const theme = useAppStore((state) => state.theme); // Get theme from Zustand store
+  // const supabaseClient = createClient() // Removed, use imported supabaseClient directly
 
   const promptDeleteGroup = (group: TaskGroup) => { // Added function
     const taskCount = getTaskCountForGroup(group.id);

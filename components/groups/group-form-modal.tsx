@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client" // Changed import
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,7 +41,7 @@ export default function GroupFormModal({
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const showToast = toast
-  const supabase = createClient()
+  // const supabase = createClient() // Removed, use imported supabase directly
   const isEditMode = !!groupToEdit
   const modalTitle = isEditMode ? `ویرایش گروه: ${groupToEdit.name}` : "ایجاد گروه جدید"
 

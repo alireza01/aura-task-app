@@ -1,5 +1,6 @@
 import { StoreApi } from 'zustand';
-import { createClient, SupabaseClient } from '@/lib/supabase/client';
+import { supabase as supabaseClient } from '@/lib/supabase/client'; // Changed import and aliased
+import type { SupabaseClient } from '@supabase/supabase-js'; // Added type import
 import type { User, UserSettings } from '@/types'; // UserProfile not directly used
 import { AppState } from './index'; // Required for AppState type in get()
 
@@ -31,7 +32,7 @@ export const createSettingsSlice = (
   set: StoreApi<AppState>['setState'],
   get: StoreApi<AppState>['getState']
 ): SettingsSlice => {
-  const supabaseClient: SupabaseClient = createClient();
+  // const supabaseClient: SupabaseClient = createClient(); // Removed, use imported supabaseClient directly
 
   return {
     // Initial State
