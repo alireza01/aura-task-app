@@ -4,38 +4,17 @@ import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types'; // Assuming this path is correct
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { checkAdminRole } from '@/lib/auth/utils';
 
 const createApiKeySchema = z.object({
   api_key: z.string().min(1).max(1000), // Assuming a reasonable max length for an API key
   name: z.string().max(255).optional().nullable(),
 });
 
-// Helper function to check if user is admin
-async function isAdmin(supabase: SupabaseClient<Database>): Promise<boolean> {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    console.error('Auth error or no user:', userError);
-    return false;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('user_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    console.error('Error fetching user profile or profile not found:', profileError?.message);
-    // If profile doesn't exist, they can't be admin
-    return false;
-  }
-  return profile.role === 'admin';
-}
-
 export async function GET(request: Request) {
   const supabase = createClient(cookies());
 
-  if (!(await isAdmin(supabase))) {
+  if (!(await checkAdminRole(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
   }
 
@@ -60,7 +39,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const supabase = createClient(cookies());
 
-  if (!(await isAdmin(supabase))) {
+  if (!(await checkAdminRole(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
   }
 

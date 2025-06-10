@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import type { Task, User } from "@/types" // GuestUser removed
+import type { Task, User } from "@/types"
 import { Archive, RotateCcw, Trash2, Calendar, Clock } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useLocalStorage } from "@/hooks/use-local-storage"

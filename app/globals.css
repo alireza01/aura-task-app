@@ -170,7 +170,7 @@
 
   /* Custom cursor for Alireza theme */
   .theme-alireza * {
-    cursor: none !important;
+    cursor: none;
   }
 
   .theme-alireza .custom-cursor {

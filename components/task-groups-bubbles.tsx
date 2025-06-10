@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import type { TaskGroup, User } from "@/types" // GuestUser removed
+import type { TaskGroup, User } from "@/types"
 import { Plus } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -19,7 +19,6 @@ import ConfirmationDialog from "@/components/ui/confirmation-dialog"; // Added i
 
 interface TaskGroupsBubblesProps {
   user: User | null
-  // guestUser: GuestUser | null, // Removed
   groups: TaskGroup[]
   selectedGroup: string | null
   onGroupSelect: (groupId: string | null) => void
@@ -30,7 +29,6 @@ interface TaskGroupsBubblesProps {
 
 export default function TaskGroupsBubbles({
   user,
-  // guestUser, // Removed
   groups,
   selectedGroup,
   onGroupSelect,
@@ -195,7 +193,6 @@ export default function TaskGroupsBubbles({
                 <GroupContextMenu
                   group={group}
                   user={user}
-                  // guestUser={guestUser} // Removed
                   settings={null}
                   taskCount={getTaskCountForGroup(group.id)}
                   onGroupsChange={onGroupsChange}
@@ -214,7 +211,6 @@ export default function TaskGroupsBubbles({
         onClose={() => setShowCreateModal(false)}
         onGroupSaved={onGroupsChange}
         user={user}
-        // guestUser={guestUser} // Removed
         settings={null}
       />
 

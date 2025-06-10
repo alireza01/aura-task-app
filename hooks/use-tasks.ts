@@ -228,19 +228,31 @@ export function useTasks({
 
     const tasksChannel = supabaseClient
       .channel('use-tasks-public-tasks') // Unique channel name for this hook instance
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${user.id}` },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks_with_counts', filter: `user_id=eq.${user.id}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const newTask = payload.new as Task;
+            const newTask = payload.new as Task; // tasks_with_counts view items are compatible with Task type
             setTasks(prevTasks => {
               if (prevTasks.find(t => t.id === newTask.id)) return prevTasks; // Already exists
-              return [...prevTasks, newTask].sort((a,b) => parseFloat(a.order_index || "0") - parseFloat(b.order_index || "0"));
+              // Ensure new task also has counts if available from payload, default to 0 if not
+              const taskToAdd = {
+                ...newTask,
+                subtask_count: newTask.subtask_count || 0,
+                tag_count: newTask.tag_count || 0,
+              };
+              return [...prevTasks, taskToAdd].sort((a,b) => parseFloat(a.order_index || "0") - parseFloat(b.order_index || "0"));
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updatedTask = payload.new as Task;
+            const updatedTask = payload.new as Task; // tasks_with_counts view items are compatible with Task type
             setTasks(prevTasks =>
-              prevTasks.map(task => (task.id === updatedTask.id ? { ...task, ...updatedTask } : task))
-                       .sort((a,b) => parseFloat(a.order_index || "0") - parseFloat(b.order_index || "0"))
+              prevTasks.map(task =>
+                task.id === updatedTask.id ? {
+                  ...task,
+                  ...updatedTask,
+                  subtask_count: updatedTask.subtask_count, // Explicitly update subtask_count
+                  tag_count: updatedTask.tag_count     // Explicitly update tag_count
+                } : task
+              ).sort((a,b) => parseFloat(a.order_index || "0") - parseFloat(b.order_index || "0"))
             );
           } else if (payload.eventType === 'DELETE') {
             const oldTaskId = (payload.old as Task).id;

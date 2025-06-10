@@ -329,64 +329,6 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
       .subscribe();
     channels.push(userSettingsChannel);
 
-    // Subtasks changes (for invalidating detailedTasks and updating counts on main tasks)
-    const subtaskChangesChannel = supabaseClient
-      .channel('dashboard-all-subtasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks' },
-        (payload) => {
-          const changedSubtask = (payload.new || payload.old) as Subtask;
-          if (changedSubtask?.task_id) {
-            // Invalidate detailed view if open
-            if (detailedTasks[changedSubtask.task_id]) {
-              setDetailedTasks(prev => {
-                const newDetailed = { ...prev };
-                delete newDetailed[changedSubtask.task_id!];
-                return newDetailed;
-              });
-            }
-            // Update count on main task object via setTasksDirectly from useTasks
-            setTasksDirectly(prevTasks => prevTasks.map(t => {
-              if (t.id === changedSubtask.task_id) {
-                let newCount = t.subtask_count || 0;
-                if (payload.eventType === 'INSERT') newCount++;
-                else if (payload.eventType === 'DELETE') newCount = Math.max(0, newCount - 1);
-                return { ...t, subtask_count: newCount };
-              }
-              return t;
-            }));
-          }
-        }
-      ).subscribe();
-    channels.push(subtaskChangesChannel);
-
-    // Task Tags changes (for invalidating detailedTasks and updating counts)
-    const taskTagsChangesChannel = supabaseClient
-      .channel('dashboard-all-task-tags')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_tags' },
-      (payload: any) => {
-        const taskId = payload.new?.task_id || payload.old?.task_id;
-        if (taskId) {
-           if (detailedTasks[taskId]) {
-              setDetailedTasks(prev => {
-                const newDetailed = { ...prev };
-                delete newDetailed[taskId];
-                return newDetailed;
-              });
-            }
-          setTasksDirectly(prevTasks => prevTasks.map(t => {
-            if (t.id === taskId) {
-              let newCount = t.tag_count || 0;
-              if (payload.eventType === 'INSERT') newCount++;
-              else if (payload.eventType === 'DELETE') newCount = Math.max(0, newCount - 1);
-              return { ...t, tag_count: newCount };
-            }
-            return t;
-          }));
-        }
-      }
-    ).subscribe();
-    channels.push(taskTagsChangesChannel);
-
     return () => {
       channels.forEach(c => supabaseClient.removeChannel(c));
     };
@@ -526,8 +468,6 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
         {/* Consolidated TaskFormModal */}
         <TaskFormModal
           user={user}
-          // guestUser prop will be removed from TaskFormModal itself in a later step
-          guestUser={null} // Passing null as guestUser prop will be removed from TaskFormModal
           groups={groups}
           tags={tags}
           settings={settings}

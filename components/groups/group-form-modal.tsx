@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, FolderPlus, Edit3, Sparkles } from "lucide-react"
-import type { TaskGroup, User, UserSettings } from "@/types" // GuestUser removed
+import type { TaskGroup, User, UserSettings } from "@/types"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -23,7 +23,6 @@ type GroupFormData = z.infer<typeof groupFormSchema>
 
 interface GroupFormModalProps {
   user: User | null
-  // guestUser: GuestUser | null, // Removed
   settings: UserSettings | null
   isOpen: boolean
   onClose: () => void
@@ -33,7 +32,6 @@ interface GroupFormModalProps {
 
 export default function GroupFormModal({
   user,
-  // guestUser, // Removed
   settings,
   isOpen,
   onClose,
