@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types';
+import { serverLogger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   const supabase = createClient(cookies());
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     .eq('user_id', user.id);
 
   if (updateError) {
-    console.error(`Failed to update is_guest for user ${user.id}:`, updateError);
+    serverLogger.error(`Failed to update is_guest for user ${user.id}`, { userId: user.id }, updateError);
     return NextResponse.json({ error: 'Failed to update user profile status.', details: updateError.message }, { status: 500 });
   }
 

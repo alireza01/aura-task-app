@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkAdminRole } from '@/lib/auth/utils';
+import { serverLogger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const supabase = createClient(cookies());
@@ -58,10 +59,11 @@ export async function GET(request: Request) {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Error fetching admin statistics:', errorMessage);
+    serverLogger.error('Error fetching admin statistics', { details: errorMessage }, error as Error);
     // Check if the error is a PostgrestError for more specific messages
     if (typeof error === 'object' && error !== null && 'message' in error) {
-        console.error('Detailed error:', (error as any).message);
+        // This additional console.error can be removed if serverLogger captures enough detail
+        // console.error('Detailed error:', (error as any).message);
     }
     return NextResponse.json({ error: 'Failed to fetch admin statistics', details: errorMessage }, { status: 500 });
   }

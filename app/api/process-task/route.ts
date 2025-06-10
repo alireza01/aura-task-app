@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from "zod";
+import { serverLogger } from "@/lib/logger";
 
 const processTaskSchema = z.object({
   title: z.string().min(1),
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     const validation = processTaskSchema.safeParse(body);
 
     if (!validation.success) {
-      console.error("API Validation Error:", validation.error.format());
+      serverLogger.error("API Validation Error", { body }, validation.error);
       return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: zero rows returned
-      console.error(`Error fetching user settings for user ${userId}:`, settingsError);
+      serverLogger.error(`Error fetching user settings for user ${userId}`, { userId }, settingsError);
       // Depending on policy, might return error if settings are crucial
     }
 
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     async function attemptApiCall(apiKey: string, keyType: 'user' | 'admin', adminKeyId?: string): Promise<boolean> {
       try {
-        console.log(`Attempting AI call with ${keyType} key...`);
+        serverLogger.info(`Attempting AI call with ${keyType} key...`, { keyType, adminKeyId, userId, title });
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: modelName });
         const chat = model.startChat({ generationConfig, history: [{ role: "user", parts: [{ text: prompt }] }] });
@@ -125,26 +126,26 @@ export async function POST(request: NextRequest) {
             if (result.importanceScore < 1) result.importanceScore = 1; if (result.importanceScore > 20) result.importanceScore = 20;
 
             usedKeyType = keyType;
-            console.log(`Successfully processed task with ${keyType} key.`);
+            serverLogger.info(`Successfully processed task with ${keyType} key.`, { keyType, adminKeyId, userId, title });
             if (keyType === 'admin' && adminKeyId) {
               supabase.from('admin_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', adminKeyId)
-                .then(({ error }) => { if (error) console.warn(`Failed to update last_used_at for admin key ${adminKeyId}:`, error.message); });
+                .then(({ error }) => { if (error) serverLogger.warn(`Failed to update last_used_at for admin key ${adminKeyId}`, { adminKeyId }, error); });
             }
             return true;
           } else {
-            console.warn(`No JSON object found in AI response using ${keyType} key. Raw text: ${aiText.substring(0, 100)}...`);
+            serverLogger.warn(`No JSON object found in AI response using ${keyType} key. Raw text: ${aiText.substring(0, 100)}...`, { keyType, adminKeyId, userId, title });
             throw new Error("No JSON object found in AI response."); // Treat as failure for this key
           }
         } else {
-          console.warn(`AI response text was empty using ${keyType} key.`);
+          serverLogger.warn(`AI response text was empty using ${keyType} key.`, { keyType, adminKeyId, userId, title });
           throw new Error("AI response text was empty."); // Treat as failure for this key
         }
       } catch (apiError: unknown) {
         const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
-        console.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'}):`, errorMessage);
+        serverLogger.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'})`, { keyType, adminKeyId, userId, title, errorMessage }, apiError as Error);
         if (errorMessage && (errorMessage.includes('API key not valid') || errorMessage.includes('API key is invalid') || errorMessage.includes('quota'))) {
           if (keyType === 'user') {
-            console.log("User API key failed with auth/quota error. Will attempt admin keys.");
+            serverLogger.info("User API key failed with auth/quota error. Will attempt admin keys.", { userId, title });
             attemptUserKey = false; // Mark that user key failed due to auth, so we don't use it again (for this request)
             return false; // Indicate failure, allowing fallback
           }
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
         success = await attemptApiCall(userApiKey, 'user');
       } catch (error: unknown) { // Catch errors re-thrown by attemptApiCall if they are non-auth related
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`AI processing failed with user key due to non-auth error: ${errorMessage}`);
+        serverLogger.error(`AI processing failed with user key due to non-auth error: ${errorMessage}`, { userId, title }, error as Error);
         // If error is safety related or other non-key specific issue
         if (errorMessage && errorMessage.includes('SAFETY')) {
           return NextResponse.json({ error: "Content blocked due to safety settings.", details: errorMessage }, { status: 400 });
@@ -176,14 +177,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!success) { // If user key was not available, or failed with auth error, or user key attempt was skipped
-      console.log("User key not used or failed with auth error, attempting admin keys.");
+      serverLogger.info("User key not used or failed with auth error, attempting admin keys.", { userId, title });
       const { data: adminKeysData, error: adminKeysError } = await supabase
         .from("admin_api_keys")
         .select("id, api_key")
         .eq("is_active", true);
 
       if (adminKeysError) {
-        console.error("Error fetching admin API keys:", adminKeysError);
+        serverLogger.error("Error fetching admin API keys", { userId, title }, adminKeysError);
       }
 
       if (adminKeysData && adminKeysData.length > 0) {
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
             if (success) break;
           } catch (error: unknown) { // Catch errors re-thrown by attemptApiCall if they are non-auth related for an admin key
              const errorMessage = error instanceof Error ? error.message : String(error);
-             console.error(`AI processing failed with admin key ${adminKey.id} due to non-auth error: ${errorMessage}`);
+             serverLogger.error(`AI processing failed with admin key ${adminKey.id} due to non-auth error: ${errorMessage}`, { adminKeyId: adminKey.id, userId, title }, error as Error);
              if (errorMessage && errorMessage.includes('SAFETY')) {
                return NextResponse.json({ error: "Content blocked due to safety settings.", details: errorMessage }, { status: 400 });
              }
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!success && (autoRanking || autoSubtasks || autoTaggingEnabled)) { // Check autoTaggingEnabled here too
-      console.error("All API key attempts (user and admin) failed or no keys available for enabled AI features.");
+      serverLogger.error("All API key attempts (user and admin) failed or no keys available for enabled AI features.", { userId, title });
       return NextResponse.json({ error: "Unable to process the request using AI at the moment. No working API key found or all attempts failed for enabled AI features." }, { status: 503 });
     } else if (!success) {
       // AI features were not critical, or no AI features requested, and no success (though this path should be covered by early exit)
@@ -219,7 +220,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error("Error processing task:", error);
+    serverLogger.error("Error processing task", { userId, title }, error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: errorMessage || "Failed to process task" }, { status: 500 });
   }

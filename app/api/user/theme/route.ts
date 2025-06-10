@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'; // Use the server client
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { serverLogger } from '@/lib/logger';
 
 const themeSchema = z.object({
   theme: z.string().min(1), // Assuming theme name cannot be empty
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
   const validation = themeSchema.safeParse(body);
 
   if (!validation.success) {
-    console.error("API Validation Error:", validation.error.format());
+    serverLogger.error("API Validation Error", { body }, validation.error);
     return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
   }
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       .upsert({ user_id: user.id, theme: theme }, { onConflict: 'user_id' });
 
     if (error) {
-      console.error('Error updating theme in user_settings:', error);
+      serverLogger.error('Error updating theme in user_settings', { userId: user.id, theme }, error);
       return NextResponse.json({ error: 'Failed to update theme' }, { status: 500 });
     }
 
