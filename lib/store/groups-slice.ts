@@ -1,6 +1,7 @@
 import { StoreApi } from 'zustand';
 import { createClient, SupabaseClient } from '@/lib/supabase/client';
-import type { User, TaskGroup, UserProfile } from '@/types';
+import type { User, TaskGroup } from '@/types'; // UserProfile not used directly in this slice state
+import { AppState } from './index'; // Required for AppState type in get()
 
 export interface GroupsSliceState {
   groups: TaskGroup[];
@@ -19,10 +20,11 @@ export interface GroupsSliceState {
 
 export type GroupsSlice = GroupsSliceState;
 
-type SetState = StoreApi<GroupsSlice>['setState'];
-type GetState = StoreApi<GroupsSlice>['getState'];
-
-export const createGroupsSlice = (set: SetState, get: GetState): GroupsSlice => {
+// No longer separate SetState/GetState, use StoreApi<AppState> directly
+export const createGroupsSlice = (
+  set: StoreApi<AppState>['setState'],
+  get: StoreApi<AppState>['getState']
+): GroupsSlice => {
   const supabaseClient: SupabaseClient = createClient();
 
   return {
