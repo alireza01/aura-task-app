@@ -2,17 +2,17 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import type { GuestUser, TaskGroup, Tag, UserSettings, User, Task } from "@/types/index"
+import type { TaskGroup, Tag, UserSettings, User, Task } from "@/types/index" // Removed GuestUser
 import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+// import { useLocalStorage } from "@/hooks/use-local-storage" // Removed
 import { useToast } from "@/components/ui/use-toast"
 import TaskForm from "@/components/tasks/task-form"
 
 interface AddTaskModalProps {
-  user: User | null
-  guestUser: GuestUser | null
+  user: User | null // This will always be a Supabase user (guest or registered)
+  // guestUser: GuestUser | null // Removed
   groups: TaskGroup[]
   tags: Tag[]
   settings: UserSettings | null
@@ -23,7 +23,7 @@ interface AddTaskModalProps {
 
 export default function AddTaskModal({
   user,
-  guestUser,
+  // guestUser, // Removed
   groups,
   tags,
   settings,
@@ -32,92 +32,77 @@ export default function AddTaskModal({
   initialTitle = "",
 }: AddTaskModalProps) {
   const [loading, setLoading] = useState(false)
-  const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
+  // const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", []) // Removed
   const { toast } = useToast()
   const supabase = createClient()
 
   const handleSaveTask = async (formData: any) => {
     setLoading(true)
     try {
-      if (user && supabase) {
-        const { data: task, error: taskError } = await supabase
-          .from("tasks")
-          .insert({
-            user_id: user.id,
-            title: formData.title.trim(),
-            description: formData.description?.trim() || null,
-            group_id: formData.groupId === "none" ? null : formData.groupId,
-            speed_score: formData.speedScore,
-            importance_score: formData.importanceScore,
-            emoji: formData.emoji,
-            order_index: 0,
-          })
-          .select()
-          .single()
+      if (!user || !user.id) { // User should always exist here (guest or registered Supabase user)
+        throw new Error("User not available. Cannot save task.");
+      }
 
-        if (taskError) {
-          throw taskError
-        }
-
-        if (formData.subtasks && formData.subtasks.length > 0) {
-          const subtaskInserts = formData.subtasks.map((subtaskTitle: string, index: number) => ({
-            task_id: task.id,
-            title: subtaskTitle.trim(),
-            order_index: index,
-          }))
-          await supabase.from("subtasks").insert(subtaskInserts)
-        }
-
-        if (formData.selectedTags && formData.selectedTags.length > 0) {
-          const tagInserts = formData.selectedTags.map((tagId: string) => ({
-            task_id: task.id,
-            tag_id: tagId,
-          }))
-          await supabase.from("task_tags").insert(tagInserts)
-        }
-
-        toast({
-          title: "وظیفه با موفقیت ایجاد شد!",
-          description: "وظیفه جدید شما با موفقیت اضافه شد.",
-        })
-      } else if (guestUser) {
-        const newTask: Task = {
-          id: Date.now().toString(),
-          user_id: guestUser.id,
+      // Always save to Supabase
+      const { data: task, error: taskError } = await supabase
+        .from("tasks")
+        .insert({
+          user_id: user.id, // Use the Supabase user's ID
           title: formData.title.trim(),
           description: formData.description?.trim() || null,
           group_id: formData.groupId === "none" ? null : formData.groupId,
           speed_score: formData.speedScore,
           importance_score: formData.importanceScore,
           emoji: formData.emoji,
-          order_index: localTasks.length,
-          completed: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          subtasks: formData.subtasks.map((subtaskTitle: string, index: number) => ({
-            id: `${Date.now()}-${index}`,
-            task_id: Date.now().toString(),
-            title: subtaskTitle.trim(),
-            completed: false,
-            order_index: index,
-            created_at: new Date().toISOString(),
-          })),
-          tags: formData.selectedTags.map((tagId: string) => tags.find((t) => t.id === tagId)!).filter(Boolean),
-        }
-        setLocalTasks([...localTasks, newTask])
-        toast({
-          title: "وظیفه در حافظه محلی ایجاد شد!",
-          description: "وظیفه جدید شما در مرورگر ذخیره شد.",
+          order_index: 0, // TODO: Determine correct order_index, perhaps based on existing tasks for the user
         })
+        .select()
+        .single()
+
+      if (taskError) {
+        throw taskError
       }
 
-      onTaskAdded()
+      if (task && formData.subtasks && formData.subtasks.length > 0) {
+        const subtaskInserts = formData.subtasks.map((subtaskTitle: string, index: number) => ({
+          task_id: task.id,
+          title: subtaskTitle.trim(),
+          order_index: index,
+          // user_id: user.id, // Not needed if subtasks table RLS uses task_id to link to user's task
+        }))
+        const { error: subtaskError } = await supabase.from("subtasks").insert(subtaskInserts)
+        if (subtaskError) {
+            console.warn("Error saving subtasks, but main task saved:", subtaskError.message);
+            // Optionally toast a warning about subtasks
+        }
+      }
+
+      if (task && formData.selectedTags && formData.selectedTags.length > 0) {
+        const tagInserts = formData.selectedTags.map((tagId: string) => ({
+          task_id: task.id,
+          tag_id: tagId,
+          // user_id: user.id, // Not needed if task_tags table RLS uses task_id/tag_id to link to user's items
+        }))
+        const { error: tagError } = await supabase.from("task_tags").insert(tagInserts)
+         if (tagError) {
+            console.warn("Error saving task tags, but main task saved:", tagError.message);
+            // Optionally toast a warning about tags
+        }
+      }
+
+      toast({
+        title: "وظیفه با موفقیت ایجاد شد!",
+        description: "وظیفه جدید شما با موفقیت اضافه شد.",
+      })
+
+      onTaskAdded() // This should trigger a refresh in TaskDashboard
       onClose()
-    } catch (error) {
+
+    } catch (error: any) {
       console.error("خطا در ایجاد وظیفه:", error)
       toast({
         title: "خطا در ایجاد وظیفه",
-        description: "مشکلی در ذخیره وظیفه رخ داد. لطفاً دوباره امتحان کنید.",
+        description: error.message || "مشکلی در ذخیره وظیفه رخ داد. لطفاً دوباره امتحان کنید.",
         variant: "destructive",
       })
     } finally {
@@ -136,7 +121,7 @@ export default function AddTaskModal({
         </DialogHeader>
         <TaskForm
           user={user}
-          guestUser={guestUser}
+          // guestUser prop removed from TaskForm if it existed there
           groups={groups}
           tags={tags}
           settings={settings}

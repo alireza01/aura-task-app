@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sparkles, Clock, Star, Plus, Loader2 } from "lucide-react"
-import type { Task, TaskGroup, UserSettings, User, GuestUser, Tag } from "@/types"
+import type { Task, TaskGroup, UserSettings, User, Tag } from "@/types" // GuestUser removed from types
 import SubTaskManager from "@/components/tasks/subtask-manager"
 import { cn } from "@/lib/utils"
 
@@ -35,8 +35,8 @@ const taskFormSchema = z.object({
 type TaskFormData = z.infer<typeof taskFormSchema>
 
 interface TaskFormProps {
-  user: User | null
-  guestUser: GuestUser | null
+  user: User | null // User is now always a Supabase User (or null if not loaded/logged in)
+  // guestUser: GuestUser | null // Removed
   groups: TaskGroup[]
   tags: Tag[]
   settings: UserSettings | null
@@ -50,9 +50,9 @@ interface TaskFormProps {
 
 export default function TaskForm({
   user,
-  guestUser,
+  // guestUser, // Removed
   groups,
-  tags, // Add tags here
+  tags,
   settings,
   taskToEdit,
   initialTitle = "",
@@ -63,7 +63,7 @@ export default function TaskForm({
 }: TaskFormProps) {
   const [subtasks, setSubtasks] = useState<string[]>([])
   const [aiProcessing, setAiProcessing] = useState(false)
-  const canUseAI = user && settings?.gemini_api_key
+  const canUseAI = user && settings?.gemini_api_key // This logic remains correct
 
   const {
     register,
@@ -126,7 +126,7 @@ export default function TaskForm({
             description: data.description,
             autoRanking: data.autoRanking,
             autoSubtasks: data.autoSubtasks,
-            userId: user!.id,
+            userId: user!.id, // user should be present if canUseAI is true
           }),
         })
 
@@ -140,7 +140,9 @@ export default function TaskForm({
 
           finalData.emoji = aiData.emoji
           if (data.autoSubtasks && aiData.subtasks?.length > 0) {
-            finalData.subtasks = [...subtasks, ...aiData.subtasks]
+            // Merge AI subtasks with manually added ones, avoiding duplicates if necessary
+            const newAiSubtasks = aiData.subtasks.filter((st: string) => !subtasks.includes(st));
+            finalData.subtasks = [...subtasks, ...newAiSubtasks];
           }
         }
       } catch (error) {
@@ -168,8 +170,8 @@ export default function TaskForm({
         <Input
           id="title"
           {...register("title")}
-          value={watchTitle}
-          onChange={(e) => setValue("title", e.target.value)}
+          // value={watchTitle} // react-hook-form handles value with register
+          // onChange={(e) => setValue("title", e.target.value)} // react-hook-form handles this
           placeholder="عنوان وظیفه را وارد کنید..."
           required
           className="glass border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-300"
@@ -199,8 +201,8 @@ export default function TaskForm({
         <Textarea
           id="description"
           {...register("description")}
-          value={watchDescription}
-          onChange={(e) => setValue("description", e.target.value)}
+          // value={watchDescription} // react-hook-form handles value
+          // onChange={(e) => setValue("description", e.target.value)} // react-hook-form handles this
           placeholder="توضیحات تکمیلی..."
           rows={3}
           className="glass border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-300 resize-none"
@@ -220,8 +222,8 @@ export default function TaskForm({
         <Input
           id="emoji"
           {...register("emoji")}
-          value={watch("emoji")}
-          onChange={(e) => setValue("emoji", e.target.value)}
+          // value={watch("emoji")} // react-hook-form handles value
+          // onChange={(e) => setValue("emoji", e.target.value)} // react-hook-form handles this
           placeholder="📝"
           className="glass border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-300 w-20 text-center text-lg"
         />
@@ -236,7 +238,10 @@ export default function TaskForm({
           transition={{ delay: 0.4 }}
         >
           <Label className="text-sm font-medium">گروه</Label>
-          <Select value={watch("groupId")} onValueChange={(value) => setValue("groupId", value)}>
+          <Select
+            defaultValue={taskToEdit?.group_id || ""}
+            onValueChange={(value) => setValue("groupId", value === "none" ? "" : value)}
+          >
             <SelectTrigger className="glass border-0 focus:ring-2 focus:ring-primary/20">
               <SelectValue placeholder="انتخاب گروه (اختیاری)" />
             </SelectTrigger>
