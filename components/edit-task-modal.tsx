@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Task, TaskGroup, UserSettings, Tag, User, GuestUser } from "@/types"
 import { Edit3 } from "lucide-react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
 import { toast } from "sonner"
 import TaskForm from "@/components/tasks/task-form"
 
@@ -31,17 +30,22 @@ export default function EditTaskModal({
   onTaskUpdated,
 }: EditTaskModalProps) {
   const [loading, setLoading] = useState(false)
-  const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const showToast = toast
   const supabaseClient = createClient()
 
   const handleSaveTask = async (formData: any) => {
     setLoading(true)
     try {
-      if (user && supabaseClient) {
-        // Update in database
-        const { error: taskError } = await supabaseClient
-          .from("tasks")
+      // Ensure we have a user session, even for guests
+      const { data: { user: currentUser } } = await supabaseClient.auth.getUser();
+
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      // Update in database
+      const { error: taskError } = await supabaseClient
+        .from("tasks")
           .update({
             title: formData.title.trim(),
             description: formData.description?.trim() || null,
@@ -62,6 +66,7 @@ export default function EditTaskModal({
             task_id: task.id,
             title: subtaskTitle.trim(),
             order_index: index,
+            user_id: currentUser.id, // Add user_id for subtasks
           }))
           await supabaseClient.from("subtasks").insert(subtaskInserts)
         }
@@ -72,34 +77,10 @@ export default function EditTaskModal({
           const tagInserts = formData.selectedTags.map((tagId: string) => ({
             task_id: task.id,
             tag_id: tagId,
+            user_id: currentUser.id, // Add user_id for task_tags
           }))
           await supabaseClient.from("task_tags").insert(tagInserts)
         }
-      } else {
-        // Update in local storage
-        const updatedTask: Task = {
-          ...task,
-          title: formData.title.trim(),
-          description: formData.description?.trim() || null,
-          group_id: formData.groupId === "none" ? null : formData.groupId,
-          speed_score: formData.speedScore,
-          importance_score: formData.importanceScore,
-          emoji: formData.emoji,
-          updated_at: new Date().toISOString(),
-          tags: formData.selectedTags.map((tagId: string) => tags.find((t) => t.id === tagId)!).filter(Boolean),
-          subtasks: formData.subtasks.map((title: string, index: number) => ({
-            id: `${Date.now()}-${index}`,
-            task_id: task.id,
-            title: title.trim(),
-            completed: false,
-            order_index: index,
-            created_at: new Date().toISOString(),
-          })),
-        }
-
-        const updatedTasks = localTasks.map((t) => (t.id === task.id ? updatedTask : t))
-        setLocalTasks(updatedTasks)
-      }
 
       showToast("وظیفه به‌روزرسانی شد", {
         description: "تغییرات با موفقیت ذخیره شد.",

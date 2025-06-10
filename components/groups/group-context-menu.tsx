@@ -35,14 +35,10 @@ export default function GroupContextMenu({
 }: GroupContextMenuProps) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
+  // localTasks is kept for taskCount as per instructions, though ideally this count should come from Supabase.
   const [localTasks, setLocalTasks] = useLocalStorage("aura-tasks", [])
   const showToast = toast
-  const [supabase, setSupabase] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
+  const supabase = createClient() // Initialize Supabase client directly
 
   const handleDeleteGroup = async () => {
     if (taskCount > 0) {
@@ -60,13 +56,15 @@ export default function GroupContextMenu({
     setLoading(true)
 
     try {
-      if (user && supabase) {
-        const { error } = await supabase.from("task_groups").delete().eq("id", group.id)
-        if (error) throw error
-      } else {
-        const updatedGroups = localGroups.filter((g) => g.id !== group.id)
-        setLocalGroups(updatedGroups)
+      // Always use Supabase for deletion. RLS will ensure the user can only delete their own groups.
+      // user prop is not strictly needed for the delete call if RLS is set up for user_id.
+      // The supabase client must be available.
+      if (!supabase) {
+        console.error("Supabase client not available for delete operation.")
+        throw new Error("Supabase client not available.")
       }
+      const { error } = await supabase.from("task_groups").delete().eq("id", group.id)
+      if (error) throw error
 
       showToast("گروه حذف شد", {
         description: `گروه "${group.name}" با موفقیت حذف شد.`,
