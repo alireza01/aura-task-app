@@ -9,23 +9,31 @@ const processTaskSchema = z.object({
   description: z.string().optional(),
   autoRanking: z.boolean().optional(),
   autoSubtasks: z.boolean().optional(),
-  userId: z.string().uuid(),
+  // userId: z.string().uuid(), // Removed from schema
 });
 
 export async function POST(request: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore); // This is createRouteHandlerClient equivalent
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const userId = user.id; // Use userId from authenticated session
+
   try {
     const body = await request.json();
     const validation = processTaskSchema.safeParse(body);
 
     if (!validation.success) {
-      console.error("API Validation Error:", validation.error);
-      return new Response(JSON.stringify({ error: "Invalid input." }), { status: 400 });
+      console.error("API Validation Error:", validation.error.format());
+      return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
-    const { title, description, autoRanking, autoSubtasks, userId } = validation.data;
-
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
+    // userId is now obtained from session, not from body
+    const { title, description, autoRanking, autoSubtasks } = validation.data;
 
     // 1. API Key List Management
     const potentialApiKeys: { key: string; type: 'user' | 'admin'; id?: string }[] = [];

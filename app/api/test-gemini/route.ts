@@ -1,25 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai"; // HarmCategory, HarmBlockThreshold removed as not used
 import { z } from "zod";
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 const testGeminiSchema = z.object({
   apiKey: z.string().min(1),
-  // prompt: z.string().min(1), // Prompt is hardcoded for this test route
 });
 
 export async function POST(request: NextRequest) {
-  // This route is intended for development testing of the Gemini API key.
-  // It should not be accessible in a production environment.
-  // Consider if this check is still needed or if admin-only access is sufficient.
-  // For now, keeping it as per original logic.
-  if (process.env.NODE_ENV === "production" && !request.url.includes('/api/admin/')) { // Allow admin usage in prod
-    // A more robust check would be to see if the caller is admin,
-    // but this route is also used by non-admin users to test their own keys.
-    // The original production check might be too restrictive if admins need to test keys in prod.
-    // For now, let's assume the original intent stands for non-admin key tests.
-    // This logic might need review based on how admin key testing vs user key testing is handled.
-    // return NextResponse.json({ error: "Not found" }, { status: 404 })
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // Optional: Add specific role checks here if needed, e.g., only admins or paying users.
+  // For now, any authenticated user can test an API key.
+
+  // The original production environment check might still be relevant or could be
+  // replaced/augmented by role-based access.
+  // if (process.env.NODE_ENV === "production" && !request.url.includes('/api/admin/')) {
+  //   return NextResponse.json({ error: "Not found" }, { status: 404 })
+  // }
 
   try {
     const body = await request.json();

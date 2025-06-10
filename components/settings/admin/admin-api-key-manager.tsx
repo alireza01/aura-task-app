@@ -48,12 +48,19 @@ const AdminApiKeyManager = () => {
   const [newApiKeyName, setNewApiKeyName] = useState('');
   const [newApiKeyString, setNewApiKeyString] = useState('');
 
+  // State for editing an existing key
+  const [editingKey, setEditingKey] = useState<AdminApiKey | null>(null);
+  const [editKeyName, setEditKeyName] = useState('');
+  const [editKeyIsActive, setEditKeyIsActive] = useState(false);
+  const [isUpdatingKey, setIsUpdatingKey] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingNewKey, setIsSavingNewKey] = useState(false);
   const [isTestingNewKey, setIsTestingNewKey] = useState(false);
   const [newKeyTestResult, setNewKeyTestResult] = useState<'success' | 'error' | null>(null);
 
   const [showKeyMap, setShowKeyMap] = useState<Record<string, boolean>>({});
+
 
   const fetchAdminApiKeys = useCallback(async () => {
     setIsLoading(true);
@@ -173,7 +180,14 @@ const AdminApiKeyManager = () => {
   };
 
   const handleToggleApiKeyActiveState = async (keyId: string, currentIsActive: boolean) => {
-    setIsLoading(true); // Or a specific loading state for the row
+    // This function can be potentially merged with or called by handleUpdateApiKey
+    // For now, let's keep it separate if it's only toggling active state directly from the switch.
+    // If Edit dialog also manages active state, then this might need adjustment.
+    //setIsLoading(true); // Using isUpdatingKey for specific row actions might be better
+    const originalKeys = [...adminApiKeys];
+    const updatedKeys = adminApiKeys.map(k => k.id === keyId ? { ...k, is_active: !currentIsActive } : k);
+    setAdminApiKeys(updatedKeys); // Optimistic update
+
     try {
       const response = await fetch(`/api/admin/api-keys/${keyId}`, {
         method: 'PUT',
@@ -182,15 +196,57 @@ const AdminApiKeyManager = () => {
       });
       if (!response.ok) {
         const errorData = await response.json();
+        setAdminApiKeys(originalKeys); // Revert optimistic update
         throw new Error(errorData.error || 'Failed to update API key status');
       }
       toast.success(`API Key ${!currentIsActive ? 'activated' : 'deactivated'}.`);
-      fetchAdminApiKeys(); // Refresh list
+      fetchAdminApiKeys(); // Re-fetch to confirm and get other potential updates
     } catch (error) {
+      setAdminApiKeys(originalKeys); // Revert optimistic update
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
       console.error('Toggle API Key Active State error:', error);
     } finally {
-      setIsLoading(false);
+      //setIsLoading(false);
+    }
+  };
+
+  const handleOpenEditDialog = (key: AdminApiKey) => {
+    setEditingKey(key);
+    setEditKeyName(key.name || '');
+    setEditKeyIsActive(key.is_active);
+  };
+
+  const handleUpdateApiKey = async () => {
+    if (!editingKey) return;
+
+    setIsUpdatingKey(true);
+    const originalKeys = [...adminApiKeys];
+    // Optimistic update for name and active state
+    const updatedKeysOptimistic = adminApiKeys.map(k =>
+      k.id === editingKey.id ? { ...k, name: editKeyName, is_active: editKeyIsActive } : k
+    );
+    setAdminApiKeys(updatedKeysOptimistic);
+
+    try {
+      const response = await fetch(`/api/admin/api-keys/${editingKey.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editKeyName, is_active: editKeyIsActive }),
+      });
+      if (!response.ok) {
+        setAdminApiKeys(originalKeys); // Revert optimistic update
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update API key');
+      }
+      toast.success('API Key updated successfully!');
+      fetchAdminApiKeys(); // Re-fetch for consistency
+      setEditingKey(null); // Close dialog
+    } catch (error) {
+      setAdminApiKeys(originalKeys); // Revert optimistic update
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+      console.error('Update API Key error:', error);
+    } finally {
+      setIsUpdatingKey(false);
     }
   };
 
@@ -296,10 +352,53 @@ const AdminApiKeyManager = () => {
                     <Button variant="outline" size="sm" onClick={() => handleTestExistingApiKey(key.api_key)}>
                       Test
                     </Button>
-                    {/* <Button variant="outline" size="sm" disabled> <Edit3 size={16} className="mr-1" /> Edit </Button> */}
+                    <Dialog open={!!editingKey && editingKey.id === key.id} onOpenChange={(isOpen) => !isOpen && setEditingKey(null)}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(key)}>
+                          <Edit3 size={16} className="mr-1" /> Edit
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit API Key</DialogTitle>
+                          <DialogDescription>
+                            Update the name and active status for API key: {maskApiKey(editingKey?.api_key || '')}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="edit-key-name" className="text-right">Name</label>
+                            <Input
+                              id="edit-key-name"
+                              value={editKeyName}
+                              onChange={(e) => setEditKeyName(e.target.value)}
+                              className="col-span-3"
+                              placeholder="Optional: Key Name"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="edit-key-active" className="text-right">Active</label>
+                            <Switch
+                              id="edit-key-active"
+                              checked={editKeyIsActive}
+                              onCheckedChange={setEditKeyIsActive}
+                              className="col-span-3"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                             <Button variant="outline" onClick={() => setEditingKey(null)}>Cancel</Button>
+                          </DialogClose>
+                          <Button onClick={handleUpdateApiKey} disabled={isUpdatingKey}>
+                            {isUpdatingKey ? 'Saving...' : 'Save Changes'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
+                        <Button variant="destructive" size="sm" disabled={isUpdatingKey}>
                           <Trash2 size={16} className="mr-1" /> Delete
                         </Button>
                       </DialogTrigger>
