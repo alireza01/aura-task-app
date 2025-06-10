@@ -38,7 +38,6 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
   const [newTagColor, setNewTagColor] = useState<Tag["color"]>("blue")
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [loading, setLoading] = useState(false)
-  const [localTags, setLocalTags] = useLocalStorage<Tag[]>("aura-tags", [])
   const showToast = toast
   const supabaseClient = createClient()
 
@@ -49,38 +48,33 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
     setLoading(true)
 
     try {
-      const newTag: Tag = {
-        id: `tag-${Date.now()}`,
-        user_id: user?.id || guestUser?.id || "guest",
-        name: newTagName.trim(),
-        color: newTagColor,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      const { data: { user: currentUser } } = await supabaseClient.auth.getUser();
+      if (!currentUser) {
+        throw new Error("User not authenticated for adding tag.");
       }
 
-      if (user && supabaseClient) {
-        const { data, error } = await supabaseClient
-          .from("tags")
-          .insert({
-            user_id: user.id,
-            name: newTag.name,
-            color: newTag.color,
-          })
-          .select()
-          .single()
+      const trimmedName = newTagName.trim();
 
-        if (error) throw error
-        newTag.id = data.id
-      } else {
-        setLocalTags([...localTags, newTag])
-      }
+      const { data: insertedTag, error } = await supabaseClient
+        .from("tags")
+        .insert({
+          user_id: currentUser.id,
+          name: trimmedName,
+          color: newTagColor,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      if (!insertedTag) throw new Error("Tag creation failed or data not returned.")
+
 
       setNewTagName("")
       setNewTagColor("blue")
       onTagsChange()
 
       showToast("برچسب اضافه شد", {
-        description: `برچسب "${newTag.name}" با موفقیت ایجاد شد.`,
+        description: `برچسب "${trimmedName}" با موفقیت ایجاد شد.`,
       })
     } catch (error) {
       console.error("خطا در ایجاد برچسب:", error)
@@ -100,24 +94,27 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
     setLoading(true)
 
     try {
-      if (user && supabaseClient) {
-        const { error } = await supabaseClient
-          .from("tags")
-          .update({
-            name: editingTag.name,
-            color: editingTag.color,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", tag.id)
-
-        if (error) throw error
-      } else {
-        const updatedTags = localTags.map((t) =>
-          t.id === tag.id ? { ...editingTag, updated_at: new Date().toISOString() } : t,
-        )
-        setLocalTags(updatedTags)
+      // RLS will ensure users can only edit their own tags.
+      // Supabase client must be available.
+      if (!supabaseClient) {
+        console.error("Supabase client not available for editing tag.")
+        throw new Error("Supabase client not available.")
+      }
+      if (!editingTag) { // Should not happen if button is only enabled when editingTag is set
+        console.error("Editing tag is null.")
+        throw new Error("Editing tag is null.")
       }
 
+      const { error } = await supabaseClient
+        .from("tags")
+        .update({
+          name: editingTag.name,
+          color: editingTag.color,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", tag.id) // tag.id comes from the original tag being edited
+
+      if (error) throw error
       setEditingTag(null)
       onTagsChange()
 
@@ -140,14 +137,14 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
     setLoading(true)
 
     try {
-      if (user && supabaseClient) {
-        const { error } = await supabaseClient.from("tags").delete().eq("id", tagId)
-        if (error) throw error
-      } else {
-        const updatedTags = localTags.filter((t) => t.id !== tagId)
-        setLocalTags(updatedTags)
+      // RLS will ensure users can only delete their own tags.
+      // Supabase client must be available.
+      if (!supabaseClient) {
+        console.error("Supabase client not available for deleting tag.")
+        throw new Error("Supabase client not available.")
       }
-
+      const { error } = await supabaseClient.from("tags").delete().eq("id", tagId)
+      if (error) throw error
       onTagsChange()
 
       showToast("برچسب حذف شد", {

@@ -10,7 +10,6 @@ import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, FolderPlus, Edit3, Sparkles } from "lucide-react"
 import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
-import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -43,7 +42,6 @@ export default function GroupFormModal({
 }: GroupFormModalProps) {
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
-  const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const showToast = toast
   const supabase = createClient()
   const isEditMode = !!groupToEdit
@@ -119,14 +117,12 @@ export default function GroupFormModal({
       const { emoji } = await response.json()
 
       // Update the group with the AI-assigned emoji
-      if (user && supabase) {
-        await supabase.from("task_groups").update({ emoji }).eq("id", groupId)
-      } else {
-        // Update local storage
-        const updatedGroups = localGroups.map((group) => (group.id === groupId ? { ...group, emoji } : group))
-        setLocalGroups(updatedGroups)
+      // Ensure supabase client is available
+      if (!supabase) {
+        console.error("Supabase client not available in assignAiEmoji");
+        return "📁"; // Fallback
       }
-
+      await supabase.from("task_groups").update({ emoji }).eq("id", groupId)
       return emoji
     } catch (error) {
       console.error("خطا در تخصیص ایموجی هوشمند:", error)
@@ -141,93 +137,56 @@ export default function GroupFormModal({
 
     try {
       const groupName = data.name.trim()
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-      if (user && supabase) {
-        // Save to Supabase
-        if (isEditMode) {
-          // Update existing group
-          const { error: updateError } = await supabase
-            .from("task_groups")
+      if (!currentUser) {
+        throw new Error("User not authenticated for group operation");
+      }
+
+      // Save to Supabase
+      if (isEditMode && groupToEdit) {
+        // Update existing group
+        const { error: updateError } = await supabase
+          .from("task_groups")
             .update({
               name: groupName,
               updated_at: new Date().toISOString(),
             })
-            .eq("id", groupToEdit!.id)
+            .eq("id", groupToEdit.id)
 
           if (updateError) throw updateError
 
           // If name changed significantly, reassign emoji
-          if (groupName.toLowerCase() !== groupToEdit!.name.toLowerCase()) {
-            await assignAiEmoji(groupName, groupToEdit!.id)
+          if (groupName.toLowerCase() !== groupToEdit.name.toLowerCase()) {
+            await assignAiEmoji(groupName, groupToEdit.id)
           }
 
           showToast.success("گروه به‌روزرسانی شد", {
             description: `گروه "${groupName}" با موفقیت به‌روزرسانی شد.`,
           })
-        } else {
-          // Create new group
-          const { data: newGroup, error: insertError } = await supabase
-            .from("task_groups")
-            .insert({
-              user_id: user.id,
-              name: groupName,
-              emoji: "📁", // Temporary emoji
-            })
-            .select()
-            .single()
-
-          if (insertError) throw insertError
-
-          // Assign AI emoji after creation
-          const aiEmoji = await assignAiEmoji(groupName, newGroup.id)
-
-          showToast.success("گروه ایجاد شد", {
-            description: `گروه "${groupName}" با موفقیت ایجاد شد.`,
-          })
-        }
       } else {
-        // Save to local storage
-        if (isEditMode) {
-          const updatedGroups = localGroups.map((group) =>
-            group.id === groupToEdit!.id
-              ? {
-                  ...group,
-                  name: groupName,
-                  updated_at: new Date().toISOString(),
-                }
-              : group,
-          )
-          setLocalGroups(updatedGroups)
-
-          // Reassign emoji if name changed
-          if (groupName.toLowerCase() !== groupToEdit!.name.toLowerCase()) {
-            await assignAiEmoji(groupName, groupToEdit!.id)
-          }
-
-          showToast.success("گروه به‌روزرسانی شد", {
-            description: `گروه "${groupName}" در حافظه محلی به‌روزرسانی شد.`,
-          })
-        } else {
-          const newGroup: TaskGroup = {
-            id: `group-${Date.now()}`,
-            user_id: guestUser?.id || "guest",
+        // Create new group
+        const { data: newGroupData, error: insertError } = await supabase
+          .from("task_groups")
+          .insert({
+            user_id: currentUser.id, // Use currentUser.id
             name: groupName,
-            emoji: "📁",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-
-          setLocalGroups([...localGroups, newGroup])
-
-          // Assign AI emoji after creation
-          await assignAiEmoji(groupName, newGroup.id)
-
-          showToast.success("گروه ایجاد شد", {
-            description: `گروه "${groupName}" در حافظه محلی ایجاد شد.`,
+            emoji: "📁", // Temporary emoji
           })
-        }
-      }
+          .select()
+          .single()
 
+        if (insertError) throw insertError
+        if (!newGroupData) throw new Error("Failed to create new group or retrieve its data.")
+
+
+        // Assign AI emoji after creation
+        await assignAiEmoji(groupName, newGroupData.id)
+
+        showToast.success("گروه ایجاد شد", {
+          description: `گروه "${groupName}" با موفقیت ایجاد شد.`,
+        })
+      }
       onGroupSaved()
       onClose()
       reset()

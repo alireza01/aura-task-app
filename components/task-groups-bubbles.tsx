@@ -39,14 +39,9 @@ export default function TaskGroupsBubbles({
 }: TaskGroupsBubblesProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null)
-  const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const showToast = toast
   const { theme } = useTheme()
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient() // Initialize Supabase client directly
 
   const handleDragOver = (e: React.DragEvent, groupId: string) => {
     e.preventDefault()
@@ -68,14 +63,13 @@ export default function TaskGroupsBubbles({
 
   const handleDeleteGroup = async (groupId: string) => {
     try {
-      if (user && supabaseClient) {
-        const { error } = await supabaseClient.from("task_groups").delete().eq("id", groupId)
-        if (error) throw error
-      } else {
-        const updatedGroups = localGroups.filter((g) => g.id !== groupId)
-        setLocalGroups(updatedGroups)
+      // Always use Supabase for deletion. RLS will ensure user can only delete their own groups.
+      if (!supabaseClient) {
+        console.error("Supabase client not available for delete group operation in bubbles.")
+        throw new Error("Supabase client not available.")
       }
-
+      const { error } = await supabaseClient.from("task_groups").delete().eq("id", groupId)
+      if (error) throw error
       onGroupsChange()
       showToast("گروه حذف شد", {
         description: "گروه با موفقیت حذف شد.",

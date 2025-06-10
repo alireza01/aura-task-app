@@ -15,7 +15,6 @@ import NicknameSetupModal from '@/components/auth/nickname-setup-modal'; // Adde
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/components/ui/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { Search, TagIcon, X, Filter, Calendar, Star, CheckCircle2, LayoutDashboard, Plus } from 'lucide-react';
@@ -59,7 +58,26 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   const [filterPriority, setFilterPriority] = useState<"all" | "high" | "medium" | "low">("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
 
-  const [hasShownSignInPrompt, setHasShownSignInPrompt] = useLocalStorage("has-shown-signin-prompt", false);
+  // const [hasShownSignInPrompt, setHasShownSignInPrompt] = useLocalStorage("has-shown-signin-prompt", false);
+  // Disabled useLocalStorage for hasShownSignInPrompt as it's not directly involved in guest conversion logic and to simplify.
+  // If it's needed, it can be re-enabled. For now, focusing on the core task.
+  const [hasShownSignInPrompt, _setHasShownSignInPrompt] = useState(false); // Temporarily use useState
+  const setHasShownSignInPrompt = (value: boolean) => {
+    // console.log("setHasShownSignInPrompt called with", value);
+    _setHasShownSignInPrompt(value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("has-shown-signin-prompt", JSON.stringify(value));
+    }
+  };
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedValue = localStorage.getItem("has-shown-signin-prompt");
+      if (storedValue) {
+        _setHasShownSignInPrompt(JSON.parse(storedValue));
+      }
+    }
+  }, []);
+
 
   const { toast } = useToast();
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
@@ -177,7 +195,83 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
       setTasks([]); setGroups([]); setTags([]); setSettings(null); setUserProfile(null); // Reset profile
       setLoading(false);
     }
-  }, [user]); // Removed loadUserData from dependency array to avoid re-triggering from itself
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // Removed loadUserData from dependency array to avoid re-triggering from itself, ESLint comment added
+
+  // Guest Conversion Handler
+  useEffect(() => {
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          const newAuthUser = session.user;
+          // Check sessionStorage for guest conversion flag
+          if (sessionStorage.getItem('guest_conversion_attempt') === 'true') {
+            sessionStorage.removeItem('guest_conversion_attempt');
+
+            // At this point, userProfile might be stale (from the previous guest session).
+            // We need to ensure it's the profile of the user *before* they signed in as registered.
+            // The `userProfile` state should ideally be the one loaded for the guest.
+
+            // Condition 1: The new user email is NOT a guest email.
+            const isNewUserEmailGuest = newAuthUser.email?.endsWith('@auratask.guest');
+
+            // Condition 2: The current userProfile in state *is* marked as guest.
+            // This implies the profile hasn't updated yet from the auth change.
+            const isCurrentProfileGuest = userProfile?.is_guest === true;
+
+            // console.log("Guest conversion check:", {
+            //   newAuthUserEmail: newAuthUser.email,
+            //   isNewUserEmailGuest,
+            //   userProfileIsGuest: userProfile?.is_guest,
+            //   currentProfileUserId: userProfile?.user_id,
+            //   newAuthUserId: newAuthUser.id
+            // });
+
+            // Ensure we are not trying to convert if the profile loaded is already for the new user and is_guest is false
+            // This can happen if profile reloads very quickly.
+            // The key is that the *profile we have in state* is still the guest one.
+            if (!isNewUserEmailGuest && isCurrentProfileGuest && userProfile?.user_id === newAuthUser.id) {
+              // console.log("Conditions met for calling /api/user/set-registered");
+              try {
+                const response = await fetch('/api/user/set-registered', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  // Body can be empty or include user_id if your API needs it,
+                  // but RLS should handle it based on the authenticated user making the request.
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                  // console.log('Successfully marked user as registered via API.');
+                  // Refresh user profile to get is_guest: false
+                  loadUserProfile(newAuthUser.id);
+                } else {
+                  console.error('Failed to mark user as registered:', result.error);
+                  toast({ title: "خطا", description: "مشکلی در تکمیل ثبت نام رخ داد.", variant: "destructive" });
+                }
+              } catch (error) {
+                console.error('Error calling /api/user/set-registered:', error);
+                toast({ title: "خطا", description: "خطای شبکه در تکمیل ثبت نام.", variant: "destructive" });
+              }
+            } else {
+              // console.log("Conditions for guest conversion API call not fully met or profile already updated.");
+            }
+          }
+        } else if (event === "SIGNED_OUT") {
+          // Clear user-related state if needed, though the main user effect should handle this.
+          // setUser(null);
+          // setUserProfile(null);
+          // setTasks([]); setGroups([]); setTags([]); setSettings(null);
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  // userProfile is a dependency because we are checking its state (is_guest)
+  // loadUserProfile is a dependency because we call it.
+  }, [supabaseClient, userProfile, loadUserProfile, toast]);
+
 
   // Effect to show nickname modal
   useEffect(() => {
