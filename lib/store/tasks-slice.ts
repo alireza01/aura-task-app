@@ -1,5 +1,6 @@
 import { StoreApi } from 'zustand';
-import { createClient, SupabaseClient } from '@/lib/supabase/client';
+import { supabase as supabaseClient } from '@/lib/supabase/client'; // Changed import and aliased
+import type { SupabaseClient } from '@supabase/supabase-js'; // Added type import
 import type { User, Task, UserProfile } from '@/types';
 import { AppState } from './index'; // Required for AppState type in get()
 import { arrayMove } from '@dnd-kit/sortable';
@@ -48,7 +49,7 @@ export const createTasksSlice = (
   set: StoreApi<AppState>['setState'],
   get: StoreApi<AppState>['getState']
 ): TasksSlice => {
-  const supabaseClient = createClient();
+  // const supabaseClient = createClient(); // Removed, use imported supabaseClient directly
 
   return {
     // Initial State

@@ -2,10 +2,7 @@
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider"; // This is our updated provider
 import { Toaster } from "sonner"; // From existing
-import { TooltipProvider } from "@/components/ui/tooltip"; // Guide adds this
 import AppInitializer from "@/components/auth/app-initializer";
-import GuestSessionManager from "@/components/auth/guest-session-manager";
-import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'; // From existing
 import ErrorBoundary from "@/components/error-boundary";
 
 export const metadata = {
@@ -30,19 +27,15 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background font-sans antialiased"> {/* Existing body classes */}
         <AppInitializer />
-        <GuestSessionManager />
-        <GuestMergeHandler /> {/* Added from existing */}
-        <TooltipProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <ErrorBoundary>{children}</ErrorBoundary>
-            <Toaster richColors position="top-right" /> {/* Toaster from existing */}
-          </ThemeProvider>
-        </TooltipProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ErrorBoundary>{children}</ErrorBoundary>
+          <Toaster richColors position="top-right" /> {/* Toaster from existing */}
+        </ThemeProvider>
       </body>
     </html>
   );

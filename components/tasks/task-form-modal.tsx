@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase as supabaseClientInstance } from "@/lib/supabase/client" // Changed import and aliased
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -38,11 +38,8 @@ export default function TaskFormModal({
   const [loading, setLoading] = useState(false)
   // const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", []) // Removed
   const showToast = toast
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  // const [supabaseClient, setSupabaseClient] = useState<any>(null) // Removed state
+  // useEffect for setting supabaseClient removed
 
   const isEditMode = !!taskToEdit
   const modalTitle = isEditMode ? `ویرایش وظیفه: ${taskToEdit?.title}` : "ایجاد وظیفه جدید"
@@ -71,11 +68,11 @@ export default function TaskFormModal({
     setLoading(true)
 
     try {
-      if (user && supabaseClient) {
+      if (user && supabaseClientInstance) { // Use aliased instance
         // Save to Supabase
         if (isEditMode) {
           // Update existing task
-          const { error: taskError } = await supabaseClient
+          const { error: taskError } = await supabaseClientInstance // Use aliased instance
             .from("tasks")
             .update({
               title: taskData.title,
@@ -92,7 +89,7 @@ export default function TaskFormModal({
 
           // Granular Subtask Update Logic
           const newSubtaskTitles = (taskData.subtasks || []).map(st => st.trim());
-          const { data: existingSubtasksData, error: fetchSubtasksError } = await supabaseClient
+          const { data: existingSubtasksData, error: fetchSubtasksError } = await supabaseClientInstance // Use aliased instance
             .from("subtasks")
             .select("id, title, order_index") // Fetched order_index too
             .eq("task_id", taskToEdit!.id);
@@ -102,7 +99,7 @@ export default function TaskFormModal({
 
           const subtasksToDelete = existingSubtasks.filter(dbSt => !newSubtaskTitles.includes(dbSt.title));
           if (subtasksToDelete.length > 0) {
-            const deleteError = await supabaseClient.from("subtasks").delete().in("id", subtasksToDelete.map(st => st.id));
+            const deleteError = await supabaseClientInstance.from("subtasks").delete().in("id", subtasksToDelete.map(st => st.id)); // Use aliased instance
             if (deleteError.error) throw deleteError.error;
           }
 
@@ -123,12 +120,12 @@ export default function TaskFormModal({
           }
 
           if (subtasksToAdd.length > 0) {
-            const { error: insertSubtasksError } = await supabaseClient.from("subtasks").insert(subtasksToAdd);
+            const { error: insertSubtasksError } = await supabaseClientInstance.from("subtasks").insert(subtasksToAdd); // Use aliased instance
             if (insertSubtasksError) throw insertSubtasksError;
           }
 
           for (const subtask of subtasksToUpdateOrder) {
-            const { error: updateOrderError } = await supabaseClient
+            const { error: updateOrderError } = await supabaseClientInstance // Use aliased instance
               .from("subtasks")
               .update({ order_index: subtask.order_index })
               .eq("id", subtask.id);
@@ -137,7 +134,7 @@ export default function TaskFormModal({
 
           // Granular Tag Update Logic
           const selectedTagIds = taskData.selectedTags || [];
-          const { data: existingTaskTagsData, error: fetchTagsError } = await supabaseClient
+          const { data: existingTaskTagsData, error: fetchTagsError } = await supabaseClientInstance // Use aliased instance
             .from("task_tags")
             .select("tag_id")
             .eq("task_id", taskToEdit!.id);
@@ -147,7 +144,7 @@ export default function TaskFormModal({
 
           const tagsToDelete = existingTagIds.filter(tagId => !selectedTagIds.includes(tagId));
           if (tagsToDelete.length > 0) {
-            const { error: deleteTagsError } = await supabaseClient
+            const { error: deleteTagsError } = await supabaseClientInstance // Use aliased instance
               .from("task_tags")
               .delete()
               .eq("task_id", taskToEdit!.id)
@@ -158,7 +155,7 @@ export default function TaskFormModal({
           const tagsToAdd = selectedTagIds.filter(tagId => !existingTagIds.includes(tagId));
           if (tagsToAdd.length > 0) {
             const tagInserts = tagsToAdd.map(tagId => ({ task_id: taskToEdit!.id, tag_id: tagId }));
-            const { error: insertTagsError } = await supabaseClient.from("task_tags").insert(tagInserts);
+            const { error: insertTagsError } = await supabaseClientInstance.from("task_tags").insert(tagInserts); // Use aliased instance
             if (insertTagsError) throw insertTagsError;
           }
 
@@ -167,7 +164,7 @@ export default function TaskFormModal({
           })
         } else {
           // Create new task
-          const { data: newTask, error: taskError } = await supabaseClient
+          const { data: newTask, error: taskError } = await supabaseClientInstance // Use aliased instance
             .from("tasks")
             .insert({
               user_id: user.id,
@@ -192,7 +189,7 @@ export default function TaskFormModal({
               order_index: index,
             }))
 
-            await supabaseClient.from("subtasks").insert(subtaskInserts)
+            await supabaseClientInstance.from("subtasks").insert(subtaskInserts) // Use aliased instance
           }
 
           showToast("وظیفه ایجاد شد", {

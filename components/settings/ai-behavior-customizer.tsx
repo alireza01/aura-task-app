@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase as supabaseClient } from "@/lib/supabase/client" // Changed import and aliased
 import type { User } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
   const debouncedAutoSubtasks = useDebounce(autoSubtasks, 500)
   const debouncedAutoTagging = useDebounce(autoTagging, 500) // Added debounce for autoTagging
   const { toast } = useToast()
-  const supabaseClient = createClient()
+  // const supabaseClient = createClient() // Removed, use imported supabaseClient directly
 
   useEffect(() => {
     if (settings) {
@@ -64,8 +64,8 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
       setLoading(true)
 
       try {
-        if (!supabaseClient) throw new Error("Supabase client not initialized")
-        const { error } = await supabaseClient.from("user_settings").upsert({
+        // if (!supabaseClient) throw new Error("Supabase client not initialized") // Check imported instance if needed
+        const { error } = await supabaseClient.from("user_settings").upsert({ // Use imported instance
           user_id: user.id,
           speed_weight: debouncedSpeedWeight,
           importance_weight: debouncedImportanceWeight,

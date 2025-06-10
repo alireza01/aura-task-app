@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react'; // useMemo removed
-import { createClient, SupabaseClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client'; // Import the supabase instance
+import type { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
 import type { User, Task, TaskGroup, UserSettings, Tag, UserProfile, Subtask } from '@/types'; // Subtask added
 import Header from '@/components/header';
 import TaskList from '@/components/task-list';
@@ -22,7 +23,6 @@ import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragE
 // arrayMove, generateFractionalIndex are in useTasks
 import TaskGroupsBubbles from '@/components/task-groups-bubbles';
 import { Skeleton } from "@/components/ui/skeleton";
-import { useLocalStorage } from '@/hooks/use-local-storage';
 // Old hooks (useTasks, useGroups, useTags) will be removed.
 import { useAppStore } from '@/lib/store'; // Import the main Zustand store
 
@@ -31,7 +31,7 @@ interface TaskDashboardProps {
 }
 
 export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboardProps) {
-  const [supabaseClient] = useState(() => createClient()); // Keep for now if needed for direct Supabase calls not in slices (e.g. loadTaskDetails)
+  const [supabaseClient] = useState<SupabaseClient>(() => supabase); // Use the imported instance and type
 
   // Auth State from Store
   const { user, userProfile, isInitialized: authIsInitialized, isLoadingAuth } = useAppStore(state => ({
@@ -179,8 +179,6 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
   const [detailedTasks, setDetailedTasks] = useState<Record<string, { subtasks: Subtask[], tags: Tag[] }>>({});
   const [loadingTaskDetails, setLoadingTaskDetails] = useState<Record<string, boolean>>({});
 
-  const [hasShownSignInPrompt, setHasShownSignInPrompt] = useLocalStorage("has-shown-signin-prompt", false);
-
   const { toast } = useToast();
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
@@ -252,11 +250,10 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
   const handleAddTask = useCallback(() => {
     if (!canAddTaskSelector()) { // Use selector from store
       openSignInPrompt(); // Use action from store
-      setHasShownSignInPrompt(true); // Local storage hook can remain for "show once" logic
     } else {
       openTaskModal('add'); // Use action from store
     }
-  }, [canAddTaskSelector, openSignInPrompt, openTaskModal, setHasShownSignInPrompt]);
+  }, [canAddTaskSelector, openSignInPrompt, openTaskModal]);
 
   const handleEditTask = useCallback((task: Task) => {
     openTaskModal('edit', task); // Use action from store

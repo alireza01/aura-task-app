@@ -11,7 +11,7 @@ import { X } from "lucide-react"
 
 import ApiKeyManager from "@/components/settings/api-key-manager"
 import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
-import ThemeSelector from "@/components/settings/theme-selector"
+import { ThemeSelector } from "@/components/settings/theme-selector" // Changed to named import
 import { AccountActions } from "@/components/settings/account-actions"
 import AdminSettingsSection from "@/components/settings/admin" // Added import
 import type { UserSettings, UserProfile } from "@/types"
@@ -136,7 +136,8 @@ export default function SettingsPanel({ user, profile, settings, isOpen, onClose
                 </TabsContent>
 
                 <TabsContent value="appearance" className="space-y-6 py-4">
-                  <ThemeSelector user={user} settings={settings} onSettingsChange={handleSettingsChange} />
+                  <ThemeSelector />
+                  {/* Props user, settings, onSettingsChange removed for now as component doesn't accept them, may need to be re-added if component is updated */}
                 </TabsContent>
 
                 <TabsContent value="account" className="space-y-6 py-4">

@@ -1,3 +1,10 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 export function generateFractionalIndex(prev?: string | null, next?: string | null): string {
   const defaultPrev = 0.0;
   const defaultNextOffset = 1.0;

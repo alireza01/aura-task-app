@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { createClient } from "@/lib/supabase/client"
+import { supabase as supabaseClientImport } from "@/lib/supabase/client" // Changed import and aliased
 import type { User } from "@/types"
 import { useRouter } from "next/navigation"
 import { signOut } from "@/lib/auth/actions"
@@ -32,23 +32,23 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const { theme, setTheme } = useTheme()
-  const supabaseClient = createClient()
+  // const supabaseClient = createClient() // Removed, use imported supabaseClientImport directly
   const router = useRouter()
 
   const handleSignIn = async () => {
-    if (!supabaseClient) return
+    // if (!supabaseClientImport) return; // Check the imported instance
     setLoading(true)
     try {
       if (user?.is_anonymous) {
         console.log('Linking anonymous user with Google');
-        await supabaseClient.auth.linkUser({
+        await supabaseClientImport.auth.linkUser({ // Use imported instance
           provider: "google",
           options: {
             redirectTo: `${window.location.origin}/auth/callback`,
           },
         });
       } else {
-        await supabaseClient.auth.signInWithOAuth({
+        await supabaseClientImport.auth.signInWithOAuth({ // Use imported instance
           provider: "google",
           options: {
             redirectTo: `${window.location.origin}/auth/callback`,

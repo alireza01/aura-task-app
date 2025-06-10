@@ -4,10 +4,10 @@
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
 import { type ThemeProviderProps } from "next-themes/dist/types";
-import { useThemeStore } from "@/lib/hooks/use-theme-store"; // Ensure this path is correct
+import { useAppStore } from '@/lib/store'; // NEW Zustand Store
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  const { theme } = useThemeStore(); // Get theme from our Zustand store
+  const theme = useAppStore((state) => state.theme); // Get theme from our Zustand store
   const { setTheme: setNextTheme } = useTheme(); // Get setTheme from next-themes
 
   // Effect to synchronize next-themes with our Zustand store

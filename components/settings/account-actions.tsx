@@ -1,6 +1,6 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client' // Changed import
 import type { User, UserProfile } from '@/types' // Ensure UserProfile is imported if not already
 import { Chrome } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 
 export function AccountActions({ user, profile }: { user: User; profile: UserProfile }) {
   const handleSignIn = async () => {
-    const supabase = createClient()
+    // const supabase = createClient() // Removed, use imported supabase directly
     if (user.is_anonymous) {
       console.log('Linking anonymous user with Google');
       await supabase.auth.linkUser({ // Updated to linkUser

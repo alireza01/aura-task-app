@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect } from "react" // Keep useEffect for now, might be used by motion/AnimatePresence implicitly or future logic
+import { supabase as supabaseClientInstance } from "@/lib/supabase/client" // Aliased import
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,11 +41,8 @@ export function TaskCard({
 }: TaskCardProps) {
   const [showDetailsSection, setShowDetailsSection] = useState(false) // Used to control visibility of details
   const [completingSubtask, setCompletingSubtask] = useState<string | null>(null)
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  // const [supabaseClient, setSupabaseClient] = useState<any>(null) // Removed state
+  // useEffect for setting supabaseClient removed
 
   const handleCompleteTask = async (checked: boolean) => {
     await onComplete(task.id, checked)
@@ -59,7 +56,7 @@ export function TaskCard({
   };
 
   const completeSubtask = async (subtaskId: string) => {
-    if (!supabaseClient) return
+    // if (!supabaseClientInstance) return; // supabaseClientInstance should always be available
     setCompletingSubtask(subtaskId)
     // Subtasks for optimistic update should come from `details` if available
     const currentSubtasks = details?.subtasks || task.subtasks || [];
@@ -72,7 +69,7 @@ export function TaskCard({
     // when a subtask completion is confirmed by Supabase, triggering a re-render.
 
     try {
-      const { error } = await supabaseClient
+      const { error } = await supabaseClientInstance // Use aliased instance
         .from("subtasks")
         .update({
           completed: true,

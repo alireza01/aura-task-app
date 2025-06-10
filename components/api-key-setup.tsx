@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react" // useEffect removed
+import { supabase as supabaseInstance } from "@/lib/supabase/client" // Changed import
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,11 +20,8 @@ export default function ApiKeySetup({ onComplete, onSkip }: ApiKeySetupProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [step, setStep] = useState(1)
-  const [supabase, setSupabase] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
+  // Removed supabase state: const [supabase, setSupabase] = useState<any>(null)
+  // Removed useEffect for setting supabase
 
   const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {
@@ -36,10 +33,10 @@ export default function ApiKeySetup({ onComplete, onSkip }: ApiKeySetupProps) {
     setError("")
 
     try {
-      if (!supabase) throw new Error("Supabase client not initialized")
+      // Use supabaseInstance directly
       const {
         data: { user },
-      } = await supabase.auth.getUser()
+      } = await supabaseInstance.auth.getUser()
       if (!user) throw new Error("کاربر یافت نشد")
 
       // Test the API key first
@@ -54,7 +51,7 @@ export default function ApiKeySetup({ onComplete, onSkip }: ApiKeySetupProps) {
       }
 
       // Save to database
-      const { error: dbError } = await supabase.from("user_settings").upsert({
+      const { error: dbError } = await supabaseInstance.from("user_settings").upsert({
         user_id: user.id,
         gemini_api_key: apiKey.trim(),
       }, { onConflict: 'user_id' });
