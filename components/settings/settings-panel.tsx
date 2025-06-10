@@ -13,6 +13,7 @@ import ApiKeyManager from "@/components/settings/api-key-manager"
 import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
 import ThemeSelector from "@/components/settings/theme-selector"
 import AccountActions from "@/components/settings/account-actions"
+import AdminSettingsSection from "@/components/settings/admin" // Added import
 import type { UserSettings, GuestUser } from "@/types"
 
 interface SettingsPanelProps {
@@ -27,14 +28,33 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
   const [activeTab, setActiveTab] = useState("ai")
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false) // Added isAdmin state
   const { toast } = useToast()
 
   // Reset state when panel opens
   useEffect(() => {
     if (isOpen) {
       setHasChanges(false)
+      // Fetch admin status when panel is opened and user is present
+      if (user && !("isGuest" in user)) {
+        fetch("/api/auth/me/role")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.role === "admin") {
+              setIsAdmin(true)
+            } else {
+              setIsAdmin(false)
+            }
+          })
+          .catch(() => {
+            setIsAdmin(false) // Default to false on error
+            console.error("Failed to fetch user role for admin check.")
+          })
+      } else {
+        setIsAdmin(false) // Not an admin if not logged in or guest
+      }
     }
-  }, [isOpen])
+  }, [isOpen, user])
 
   // Handle escape key to close panel
   useEffect(() => {
@@ -124,6 +144,13 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
                   )}
                 </TabsContent>
               </Tabs>
+
+              {/* Admin Section */}
+              {isAdmin && (
+                <div className="mt-8 pt-6 border-t">
+                  <AdminSettingsSection />
+                </div>
+              )}
             </motion.div>
           </DialogContent>
         </Dialog>
