@@ -2,10 +2,27 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { z } from "zod";
+
+const processTaskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  autoRanking: z.boolean().optional(),
+  autoSubtasks: z.boolean().optional(),
+  userId: z.string().uuid(),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const { title, description, autoRanking, autoSubtasks, userId } = await request.json()
+    const body = await request.json();
+    const validation = processTaskSchema.safeParse(body);
+
+    if (!validation.success) {
+      console.error("API Validation Error:", validation.error);
+      return new Response(JSON.stringify({ error: "Invalid input." }), { status: 400 });
+    }
+
+    const { title, description, autoRanking, autoSubtasks, userId } = validation.data;
 
     const cookieStore = cookies()
     const supabase = createClient(cookieStore)

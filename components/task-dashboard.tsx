@@ -167,21 +167,13 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
         if (session?.user) {
           setUser(session.user);
         } else {
-          const guestEmail = `guest_${uuidv4()}@auratask.guest`;
-          const guestPassword = uuidv4();
-          const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
-            email: guestEmail,
-            password: guestPassword,
-          });
-          if (signUpError) {
-            console.error("Error creating Supabase guest account:", signUpError.message);
-            toast({ title: "خطا در ایجاد حساب مهمان", variant: "destructive" });
-            setLoading(false);
-          } else if (signUpData.user) {
-            setUser(signUpData.user);
-          } else {
-             setLoading(false);
-          }
+          // AppInitializer should handle anonymous user creation.
+          // If no session here, it might mean AppInitializer is still working
+          // or there was an issue. Rely on onAuthStateChange to eventually set the user.
+          console.log("TaskDashboard: No initial user and no session from getSession. Waiting for AppInitializer/onAuthStateChange.");
+          // We might still want to set loading to false after a timeout if no user appears,
+          // or handle this state more gracefully. For now, AppInitializer is the primary source of user session.
+          setLoading(false);
         }
       };
       ensureSession();

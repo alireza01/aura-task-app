@@ -1,5 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { z } from "zod";
+
+const testGeminiSchema = z.object({
+  apiKey: z.string().min(1),
+  // prompt: z.string().min(1), // Prompt is hardcoded for this test route
+});
 
 export async function POST(request: NextRequest) {
   // This route is intended for development testing of the Gemini API key.
@@ -16,11 +22,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { apiKey } = await request.json()
+    const body = await request.json();
+    const validation = testGeminiSchema.safeParse(body);
 
-    if (!apiKey) {
-      return NextResponse.json({ error: "API key is required" }, { status: 400 })
+    if (!validation.success) {
+      console.error("API Validation Error:", validation.error.format());
+      return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
+
+    const { apiKey } = validation.data;
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
