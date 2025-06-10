@@ -178,6 +178,7 @@ export default function Dropdown({ options, value, placeholder, onSelect, classN
                     )}
                     role="option"
                     aria-selected={option.value === value}
+                    aria-disabled={option.disabled}
                   >
                     <div className="flex items-center gap-2">
                       {option.icon}

@@ -22,6 +22,7 @@ import StatsDashboard from '@/components/stats-dashboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+import { generateFractionalIndex } from '@/lib/utils';
 import TaskGroupsBubbles from '@/components/task-groups-bubbles';
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -52,6 +53,8 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   const [loading, setLoading] = useState(true);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null); // Tracks if initial data loaded for the current user ID
+  const [detailedTasks, setDetailedTasks] = useState<Record<string, { subtasks: Subtask[], tags: Tag[] }>>({});
 
   const [filterGroup, setFilterGroup] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "completed" | "active">("all");
@@ -99,9 +102,81 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
 
   const loadTasks = useCallback(async (currentUserId: string) => {
     if (!currentUserId || !supabaseClient) return;
-    const { data } = await supabaseClient.from("tasks").select(`*, subtasks(*), tags(*)`).eq("user_id", currentUserId).order("order_index");
-    setTasks(data || []);
+    // Attempt to fetch tasks with counts of subtasks and tags
+    // Note: The exact syntax for counts of related many-to-many tables (tags via task_tags) can be tricky.
+    // This is a common way to get counts for direct foreign key relations (subtasks).
+    // For tags (many-to-many through task_tags), this might simplify to just subtask_count or require an RPC.
+    // If `task_tags(count)` doesn't work as expected, Supabase might return an error or incorrect structure.
+    // A fallback would be to select only `subtasks(count)` or just `*` and handle counts differently or omit them.
+    // For this subtask, we try the count syntax. If it fails in practice, schema/RPC would be needed.
+    const { data, error } = await supabaseClient
+      .from("tasks")
+      .select("*, subtask_count:subtasks(count), tag_count:task_tags(count)") // Corrected tags to task_tags for count
+      .eq("user_id", currentUserId)
+      .order("order_index", { ascending: true });
+
+    if (error) {
+      console.error("Error loading tasks with counts:", error);
+      // Fallback to loading tasks without counts if the count query fails
+      const { data: fallbackData, error: fallbackError } = await supabaseClient
+        .from("tasks")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .order("order_index", { ascending: true });
+      if (fallbackError) {
+        console.error("Error loading tasks (fallback):", fallbackError);
+        setTasks([]);
+      } else {
+        setTasks(fallbackData || []);
+      }
+    } else {
+      setTasks(data || []);
+    }
   }, [supabaseClient]);
+
+  const loadTaskDetails = useCallback(async (taskId: string) => {
+    if (!supabaseClient || detailedTasks[taskId]) return; // Already loaded or loading
+
+    // console.log(`Loading details for task ${taskId}`);
+    // Optionally, set a loading state for this specific task in detailedTasks
+    // setDetailedTasks(prev => ({ ...prev, [taskId]: { loading: true, subtasks: [], tags: [] } }));
+
+    try {
+      const { data: subtasksData, error: subtasksError } = await supabaseClient
+        .from("subtasks")
+        .select("*")
+        .eq("task_id", taskId)
+        .order("order_index", { ascending: true });
+
+      if (subtasksError) throw subtasksError;
+
+      // Fetch tags for the task via task_tags
+      const { data: taskTagsData, error: taskTagsError } = await supabaseClient
+        .from("task_tags")
+        .select("tags(*)") // Select all columns from the related tags table
+        .eq("task_id", taskId);
+
+      if (taskTagsError) throw taskTagsError;
+
+      // The result from taskTagsData will be like [{ tags: {id, name, color, ...} }, ...]
+      // So we need to extract the actual tag objects.
+      const fetchedTags: Tag[] = taskTagsData ? taskTagsData.map(tt => tt.tags).filter(Boolean) as Tag[] : [];
+
+      setDetailedTasks(prev => ({
+        ...prev,
+        [taskId]: { subtasks: subtasksData || [], tags: fetchedTags },
+      }));
+    } catch (error) {
+      console.error(`Error loading task details for ${taskId}:`, error);
+      toast({ title: "خطا در بارگیری جزئیات وظیفه", description: (error as Error).message, variant: "destructive" });
+      // Remove loading state if set
+      // setDetailedTasks(prev => {
+      //   const newState = { ...prev };
+      //   if(newState[taskId]?.loading) delete newState[taskId]; // Or set loading: false
+      //   return newState;
+      // });
+    }
+  }, [supabaseClient, detailedTasks, toast]);
 
   const loadGroups = useCallback(async (currentUserId: string) => {
     if (!currentUserId || !supabaseClient) return;
@@ -181,14 +256,24 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   }, [initialUser, supabaseClient, loadUserData, toast]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && user.id !== loadedUserId) {
+      // User has changed or is loaded for the first time
+      setTasks([]); setGroups([]); setTags([]); setSettings(null); setUserProfile(null); // Reset data for new user
+      setLoading(true); // Show loading for new user data
       loadUserData(user.id, user);
-    } else {
+      setLoadedUserId(user.id);
+    } else if (!user?.id && loadedUserId) {
+      // User logged out
       setTasks([]); setGroups([]); setTags([]); setSettings(null); setUserProfile(null); // Reset profile
+      setLoadedUserId(null); // Reset loaded user ID
+      setLoading(false); // Not loading data for a logged-out state
+    } else if (!user?.id) {
+      // Initial state, no user, not previously loaded
       setLoading(false);
     }
+    // If user.id === loadedUserId, do nothing, data is already loaded and realtime handles updates.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); // Removed loadUserData from dependency array to avoid re-triggering from itself, ESLint comment added
+  }, [user, loadUserData, loadedUserId]); // loadUserData and loadedUserId are dependencies
 
   // Guest Conversion Handler
   useEffect(() => {
@@ -281,28 +366,247 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   // Realtime subscriptions
   useEffect(() => {
     if (!user?.id || !supabaseClient) return;
-    const channels = [];
-    const tables = ['tasks', 'task_groups', 'tags', 'user_profiles', 'user_settings']; // Add user_profiles and user_settings
-    tables.forEach(table => {
-      const channel = supabaseClient
-        .channel(`public:${table}:user_id=eq.${user.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table, filter: `user_id=eq.${user.id}` }, (payload) => {
-          if (table === 'tasks') loadTasks(user.id);
-          else if (table === 'task_groups') loadGroups(user.id);
-          else if (table === 'tags') loadTags(user.id);
-          else if (table === 'user_profiles') loadUserProfile(user.id);
-          else if (table === 'user_settings') loadSettings(user.id, user, userProfile); // Pass userProfile
-        })
-        .subscribe(/* removed status logs for brevity */);
-      channels.push(channel);
-    });
+
+    const channels: SupabaseClient['channels'] = [];
+
+    // Handle Tasks
+    const tasksChannel = supabaseClient
+      .channel('public:tasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          // Existing logic for main tasks list (setTasks) should be mostly fine.
+          // It will receive tasks with counts, not full subtasks/tags.
+          // If a task that is in detailedTasks is updated, we might want to refresh its details.
+          const taskId = payload.new?.id || payload.old?.id;
+
+          if (payload.eventType === 'INSERT') {
+            const newTask = payload.new as Task;
+            // No subtasks/tags to initialize here as they are not part of the main task object anymore
+            setTasks(prevTasks => [...prevTasks, newTask].sort((a,b) => parseFloat(a.order_index || "0") - parseFloat(b.order_index || "0")));
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedTask = payload.new as Task;
+            setTasks(prevTasks =>
+              prevTasks.map(task => (task.id === updatedTask.id ? { ...task, ...updatedTask } : task))
+                       .sort((a,b) => parseFloat(a.order_index || "0") - parseFloat(b.order_index || "0"))
+            );
+            // If the updated task is in detailedTasks, invalidate its details to be refetched on next view, or refetch now.
+            // For simplicity, let's invalidate. User can re-expand to get fresh details.
+            // Or, more proactively:
+            if (taskId && detailedTasks[taskId]) {
+              // setDetailedTasks(prev => { ...prev, [taskId]: undefined }); // Mark as stale
+              // OR refetch:
+              // loadTaskDetails(taskId); // This might cause issues if called too frequently from many updates.
+              // A safer invalidation:
+              setDetailedTasks(prev => {
+                const newDetailed = { ...prev };
+                delete newDetailed[taskId]; // Remove to trigger reload on next access
+                return newDetailed;
+              });
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const oldTaskId = (payload.old as Task).id;
+            setTasks(prevTasks => prevTasks.filter(task => task.id !== oldTaskId));
+            if (oldTaskId) {
+              setDetailedTasks(prev => {
+                const newDetailed = { ...prev };
+                delete newDetailed[oldTaskId];
+                return newDetailed;
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+    channels.push(tasksChannel);
+
+    // Handle Task Groups
+    const groupsChannel = supabaseClient
+      .channel('public:task_groups')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_groups', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new && (payload.new as TaskGroup).user_id !== user.id) return;
+          // No user_id in old payload for groups, rely on filter or session.
+
+          if (payload.eventType === 'INSERT') {
+            setGroups(prevGroups => [...prevGroups, payload.new as TaskGroup].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+          } else if (payload.eventType === 'UPDATE') {
+            setGroups(prevGroups =>
+              prevGroups.map(group => (group.id === (payload.new as TaskGroup).id ? payload.new as TaskGroup : group))
+                        .sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroups(prevGroups => prevGroups.filter(group => group.id !== (payload.old as TaskGroup).id));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(groupsChannel);
+
+    // Handle Tags
+    const tagsChannel = supabaseClient
+      .channel('public:tags')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new && (payload.new as Tag).user_id !== user.id) return;
+          // No user_id in old payload for tags, rely on filter or session.
+
+          if (payload.eventType === 'INSERT') {
+            setTags(prevTags => [...prevTags, payload.new as Tag].sort((a,b) => a.name.localeCompare(b.name)));
+          } else if (payload.eventType === 'UPDATE') {
+            setTags(prevTags =>
+              prevTags.map(tag => (tag.id === (payload.new as Tag).id ? payload.new as Tag : tag))
+                      .sort((a,b) => a.name.localeCompare(b.name))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setTags(prevTags => prevTags.filter(tag => tag.id !== (payload.old as Tag).id));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(tagsChannel);
+
+    // Handle User Profiles
+    const userProfileChannel = supabaseClient
+      .channel('public:user_profiles')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if ((payload.new as UserProfile).user_id === user.id) {
+            setUserProfile(prevProfile => ({ ...prevProfile, ...(payload.new as UserProfile) }));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(userProfileChannel);
+
+    // Handle User Settings
+    const userSettingsChannel = supabaseClient
+      .channel('public:user_settings')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_settings', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if ((payload.new as UserSettings).user_id === user.id) {
+            setSettings(prevSettings => ({ ...prevSettings, ...(payload.new as UserSettings) }));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(userSettingsChannel);
+
+    // Handle Subtasks
+    // Subtasks do not have a direct user_id column. RLS for subtasks is based on the parent task's user_id.
+    // So, we subscribe to all subtask changes and then filter client-side by checking if the parent task exists in our state.
     const subtasksChannel = supabaseClient
-      .channel(`public:subtasks:user_id=eq.${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks' }, () => loadTasks(user.id))
+      .channel('public:subtasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks' },
+        (payload) => {
+          const subtaskRecord = (payload.new || payload.old) as any; // Type to Subtask later
+          if (!subtaskRecord || !subtaskRecord.task_id) return;
+
+          setTasks(prevTasks => { // This whole block needs to be re-evaluated for lazy loading
+            const parentTaskId = subtaskRecord.task_id;
+            // If the parent task's details are loaded, update them.
+            if (detailedTasks[parentTaskId]) {
+              let newSubtasksList: Subtask[];
+              const currentSubtasks = detailedTasks[parentTaskId]?.subtasks || [];
+
+              if (payload.eventType === 'INSERT') {
+                newSubtasksList = [...currentSubtasks, payload.new as Subtask].sort((a,b) => a.order_index - b.order_index);
+              } else if (payload.eventType === 'UPDATE') {
+                newSubtasksList = currentSubtasks.map(st => (st.id === (payload.new as Subtask).id ? payload.new as Subtask : st))
+                                                 .sort((a,b) => a.order_index - b.order_index);
+              } else if (payload.eventType === 'DELETE') {
+                newSubtasksList = currentSubtasks.filter(st => st.id !== (payload.old as Subtask).id);
+              } else {
+                newSubtasksList = currentSubtasks; // Should not happen
+              }
+              setDetailedTasks(prevDetailed => ({
+                ...prevDetailed,
+                [parentTaskId]: { ...prevDetailed[parentTaskId], subtasks: newSubtasksList }
+              }));
+            }
+            // Also update the subtask_count on the main task object in the `tasks` state
+            const parentTaskIndex = prevTasks.findIndex(t => t.id === parentTaskId);
+            if (parentTaskIndex !== -1) {
+              const newTasks = [...prevTasks];
+              const currentTask = { ...newTasks[parentTaskIndex] };
+              if (payload.eventType === 'INSERT') {
+                currentTask.subtask_count = (currentTask.subtask_count || 0) + 1;
+              } else if (payload.eventType === 'DELETE') {
+                currentTask.subtask_count = Math.max(0, (currentTask.subtask_count || 0) - 1);
+              }
+              // UPDATE to a subtask doesn't change count.
+              newTasks[parentTaskIndex] = currentTask;
+              return newTasks;
+            }
+            return prevTasks; // Return original if parent task not found for count update
+          });
+        }
+      )
       .subscribe();
     channels.push(subtasksChannel);
-    return () => { channels.forEach(channel => supabaseClient.removeChannel(channel)); };
-  }, [user?.id, user, userProfile, supabaseClient, loadTasks, loadGroups, loadTags, loadUserProfile, loadSettings]);
+
+    // Realtime for task_tags (to update tag_count and detailedTasks if a task's tags change)
+    const taskTagsChannel = supabaseClient
+      .channel('public:task_tags')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_tags' },
+        async (payload: any) => {
+          const taskId = payload.new?.task_id || payload.old?.task_id;
+          if (!taskId) return;
+
+          // Update tag_count on the main task object
+          setTasks(prevTasks => {
+            const parentTaskIndex = prevTasks.findIndex(t => t.id === taskId);
+            if (parentTaskIndex !== -1) {
+              const newTasks = [...prevTasks];
+              const currentTask = { ...newTasks[parentTaskIndex] };
+              // Refetch count for simplicity or adjust based on eventType
+              // This is a simplification; ideally, you'd increment/decrement.
+              // For now, just mark its details as stale if loaded.
+              if (payload.eventType === 'INSERT') {
+                currentTask.tag_count = (currentTask.tag_count || 0) + 1;
+              } else if (payload.eventType === 'DELETE') {
+                currentTask.tag_count = Math.max(0, (currentTask.tag_count || 0) - 1);
+              }
+              newTasks[parentTaskIndex] = currentTask;
+              return newTasks;
+            }
+            return prevTasks;
+          });
+
+          // If the task's details are currently loaded, refresh them
+          if (detailedTasks[taskId]) {
+            // Invalidate and reload, or try to update tags based on payload.
+            // Reloading is simpler here.
+            // To avoid rapid reloads if many tags change, could debounce or mark stale.
+            // loadTaskDetails(taskId); // This might be too aggressive.
+            // Mark as stale:
+            setDetailedTasks(prev => {
+                const newDetailed = { ...prev };
+                delete newDetailed[taskId];
+                return newDetailed;
+            });
+          }
+        }
+      )
+      .subscribe();
+    channels.push(taskTagsChannel);
+
+
+    return () => {
+      channels.forEach(c => supabaseClient.removeChannel(c));
+    };
+  }, [user?.id, supabaseClient, setTasks, setGroups, setTags, setUserProfile, setSettings, detailedTasks, loadTaskDetails]); // Added detailedTasks and loadTaskDetails
+
+  // ... (rest of the component, including passing detailedTasks[task.id] and loadTaskDetails to TaskList/TaskCard)
+  // The TaskList component will need to be updated to accept and pass these props to TaskCard.
+  // TaskCard will then use these props to display subtasks/tags and trigger loading.
+  // For example, in TaskList:
+  // tasks.map(task => <TaskCard key={task.id} task={task} details={detailedTasks[task.id]} loadDetails={() => loadTaskDetails(task.id)} ... />)
+  // And in TaskCard:
+  // const { task, details, loadDetails } = props;
+  // const currentSubtasks = details?.subtasks || []; // Or show loading / expand button
+  // If !details and task.subtask_count > 0, show button that calls loadDetails()
+
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
 
 
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
@@ -357,11 +661,52 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event; if (!over || !user?.id) return;
     if (active.data.current?.type === "task" && active.id !== over.id) {
-        const oldIndex = tasks.findIndex((t) => t.id === active.id); const newIndex = tasks.findIndex((t) => t.id === over.id); if (oldIndex === -1 || newIndex === -1) return;
-        const reorderedTasks = arrayMove(tasks, oldIndex, newIndex); setTasks(reorderedTasks);
-        const updates = reorderedTasks.map((task, index) => ({ id: task.id, user_id: user.id, order_index: index, }));
-        try { const { error } = await supabaseClient.from("tasks").upsert(updates); if (error) throw error; }
-        catch (error) { console.error("Error reordering tasks:", error); toast({ title: "خطا در به‌روزرسانی ترتیب وظایف", variant: "destructive" }); loadTasks(user.id); }
+        const oldIndex = tasks.findIndex((t) => t.id === active.id);
+        const newPotentialIndex = tasks.findIndex((t) => t.id === over.id); // This is the index of the item we are dropping ON or BEFORE
+        if (oldIndex === -1 || newPotentialIndex === -1) return;
+
+        // Simulate the move to find tasks before and after the new position
+        // Note: arrayMove moves the item at oldIndex to be AT newPotentialIndex.
+        // So, the item that was at newPotentialIndex and items after it are shifted.
+        const tempReorderedTasks = arrayMove(tasks, oldIndex, newPotentialIndex);
+        const finalNewIndexInTempArray = tempReorderedTasks.findIndex(t => t.id === active.id);
+
+        const prevTask = finalNewIndexInTempArray > 0 ? tempReorderedTasks[finalNewIndexInTempArray - 1] : null;
+        const nextTask = finalNewIndexInTempArray < tempReorderedTasks.length - 1 ? tempReorderedTasks[finalNewIndexInTempArray + 1] : null;
+
+        const newOrderIndex = generateFractionalIndex(prevTask?.order_index, nextTask?.order_index);
+
+        // Update the order_index property of the moved task in the local array
+        const reorderedTasksWithUpdatedIndex = tempReorderedTasks.map(task =>
+          task.id === active.id ? { ...task, order_index: newOrderIndex } : task
+        );
+
+        // The local array is already in the new visual order due to arrayMove.
+        // Now that the specific item has its new fractional index,
+        // a full sort of `reorderedTasksWithUpdatedIndex` by `order_index` (as string floats)
+        // should maintain this order and also correctly place the item based on its new index
+        // relative to others if fractional logic created a value that lexicographically fits.
+        reorderedTasksWithUpdatedIndex.sort((a, b) => {
+            const aIndex = a.order_index ? parseFloat(a.order_index) : 0;
+            const bIndex = b.order_index ? parseFloat(b.order_index) : 0;
+            return aIndex - bIndex;
+        });
+
+        setTasks(reorderedTasksWithUpdatedIndex);
+
+        try {
+          const { error } = await supabaseClient
+            .from("tasks")
+            .update({ order_index: newOrderIndex })
+            .eq("id", active.id)
+            .eq("user_id", user.id);
+          if (error) throw error;
+        } catch (error) {
+          console.error("Error reordering tasks:", error);
+          toast({ title: "خطا در به‌روزرسانی ترتیب وظایف", variant: "destructive" });
+          // Revert local state or reload tasks on error
+          loadTasks(user.id); // Reload to ensure consistency
+        }
     } setActiveId(null);
   };
   const handleDragStart = (event: any) => { setActiveId(event.active.id); }; const handleDragCancel = () => { setActiveId(null); };
@@ -419,10 +764,10 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
                     </div>
                   </div>
                   <AnimatePresence>{showFilters && (<motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}><div className="bg-muted/30 rounded-lg p-4 mb-4"><div className="flex flex-wrap gap-3"><div className="relative flex-1 min-w-[200px]"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input type="search" placeholder="جستجو..." className="pr-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background sm:w-[150px]" value={filterGroup || ""} onChange={(e) => setFilterGroup(e.target.value || null)}><option value="">همه گروه‌ها</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.emoji} {group.name}</option>))}</select><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background sm:w-[150px]" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}><option value="all">همه وضعیت‌ها</option><option value="active">در انتظار انجام</option><option value="completed">تکمیل شده</option></select><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background sm:w-[150px]" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value as any)}><option value="all">همه اولویت‌ها</option><option value="high">اولویت بالا</option><option value="medium">اولویت متوسط</option><option value="low">اولویت پایین</option></select><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background sm:w-[150px]" value={filterTag || ""} onChange={(e) => setFilterTag(e.target.value || null)}><option value="">همه برچسب‌ها</option>{tags.map((tag) => (<option key={tag.id} value={tag.id}>{tag.name}</option>))}</select>{hasActiveFilters && (<Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1"><X className="h-4 w-4" />پاک کردن فیلترها</Button>)}</div></div></motion.div>)}</AnimatePresence>
-                  <TabsContent value="all" className="mt-0">{activeTab === "all" && (<div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><div className="lg:col-span-2"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} /></div><div className="hidden lg:block"><StatsDashboard tasks={tasks} /></div></div>)}</TabsContent>
-                  <TabsContent value="today" className="mt-0"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} /></TabsContent>
-                  <TabsContent value="important" className="mt-0"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} /></TabsContent>
-                  <TabsContent value="completed" className="mt-0"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} /></TabsContent>
+                  <TabsContent value="all" className="mt-0">{activeTab === "all" && (<div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><div className="lg:col-span-2"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} detailedTasks={detailedTasks} loadTaskDetails={loadTaskDetails} /></div><div className="hidden lg:block"><StatsDashboard tasks={tasks} /></div></div>)}</TabsContent>
+                  <TabsContent value="today" className="mt-0"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} detailedTasks={detailedTasks} loadTaskDetails={loadTaskDetails} /></TabsContent>
+                  <TabsContent value="important" className="mt-0"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} detailedTasks={detailedTasks} loadTaskDetails={loadTaskDetails} /></TabsContent>
+                  <TabsContent value="completed" className="mt-0"><TaskList tasks={filteredTasks} groups={groups} settings={settings} user={user} onTasksChange={handleTaskAddedOrUpdated} onGroupsChange={handleGroupsChange} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onComplete={completeTask} detailedTasks={detailedTasks} loadTaskDetails={loadTaskDetails} /></TabsContent>
                 </Tabs>
               </div>
             </>

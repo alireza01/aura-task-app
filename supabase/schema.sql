@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   speed_score INTEGER,
   importance_score INTEGER,
   emoji TEXT,
-  order_index INTEGER DEFAULT 0,
+  order_index TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -83,7 +83,8 @@ CREATE TABLE IF NOT EXISTS public.tags (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
-  color TEXT NOT NULL DEFAULT 'blue',
+  color TEXT NOT NULL DEFAULT 'blue'
+    CHECK (color IN ('red', 'green', 'blue', 'yellow', 'purple', 'orange')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, name)

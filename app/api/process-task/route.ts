@@ -35,81 +35,35 @@ export async function POST(request: NextRequest) {
     // userId is now obtained from session, not from body
     const { title, description, autoRanking, autoSubtasks } = validation.data;
 
-    // 1. API Key List Management
-    const potentialApiKeys: { key: string; type: 'user' | 'admin'; id?: string }[] = [];
-
-    // Get user's API key
+    // 1. Fetch User Settings (includes API key and weights)
     const { data: settings, error: settingsError } = await supabase
       .from("user_settings")
       .select("gemini_api_key, speed_weight, importance_weight")
       .eq("user_id", userId)
-      .single()
+      .single();
 
     if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: zero rows returned
-      console.error("Error fetching user settings:", settingsError);
-      // Potentially return error if this is unexpected
+      console.error(`Error fetching user settings for user ${userId}:`, settingsError);
+      // Depending on policy, might return error if settings are crucial
     }
 
-    if (settings?.gemini_api_key) {
-      potentialApiKeys.push({ key: settings.gemini_api_key, type: 'user' });
-    }
+    const userApiKey = settings?.gemini_api_key;
+    const modelName = "gemini-2.5-flash-preview-05-20"; // Model name
 
-    // Fetch active admin API keys
-    const { data: adminKeysData, error: adminKeysError } = await supabase
-      .from("admin_api_keys")
-      .select("id, api_key")
-      .eq("is_active", true);
-
-    if (adminKeysError) {
-      console.error("Error fetching admin API keys:", adminKeysError);
-      // Don't necessarily fail the request, user key might still work or no keys needed if all auto features off
-    }
-
-    if (adminKeysData && adminKeysData.length > 0) {
-      // Shuffle admin keys
-      for (let i = adminKeysData.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [adminKeysData[i], adminKeysData[j]] = [adminKeysData[j], adminKeysData[i]];
-      }
-      adminKeysData.forEach(ak => potentialApiKeys.push({ key: ak.api_key, type: 'admin', id: ak.id }));
-    }
-
-    // If no processing that requires AI is enabled, can return early or with default values.
-    // For this refactor, we assume AI processing is intended if the route is hit.
-    if (potentialApiKeys.length === 0 && (autoRanking || autoSubtasks)) {
-        return NextResponse.json({ error: "No API keys available (user or admin) to process this request." }, { status: 503 });
-    }
-
-
-    // Model Name Verification: Using gemini-2.5-flash-preview-05-20 as per subtask instruction
-    const modelName = "gemini-2.5-flash-preview-05-20";
-    // const genAI = new GoogleGenerativeAI(apiKey); // Will be initialized in the loop
-    // const model = genAI.getGenerativeModel({ model: modelName }); // Will be initialized in the loop
-    // Ensure safety settings if not default
-    // safetySettings: [
-    //   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      //   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-      //   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      //   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      // ],
-    // });
-
-    let result: any = {}
-    // Default result structure if AI processing is skipped or fails entirely
+    let result: any = {};
     const defaultResult = {
-      speedScore: settings?.speed_weight ? Math.round(settings.speed_weight / 5) : 10, // Default based on weight or 10
-      importanceScore: settings?.importance_weight ? Math.round(settings.importance_weight / 5) : 10, // Default based on weight or 10
+      speedScore: settings?.speed_weight ? Math.round(settings.speed_weight / 5) : 10,
+      importanceScore: settings?.importance_weight ? Math.round(settings.importance_weight / 5) : 10,
       emoji: "📝",
       subtasks: [],
     };
 
     if (!autoRanking && !autoSubtasks) {
-      // If no AI features are requested, return defaults immediately.
       return NextResponse.json(defaultResult);
     }
 
-    // Prepare AI prompt
-    let prompt = `وظیفه: "${title}"`
+    // Prepare AI prompt (remains the same)
+    let prompt = `وظیفه: "${title}"`;
     if (description) {
       prompt += `\nتوضیحات: "${description}"`
     }
@@ -138,22 +92,15 @@ export async function POST(request: NextRequest) {
     };
 
     let success = false;
-    let lastError: any = null;
+    let usedKeyType: 'user' | 'admin' | null = null;
+    let attemptUserKey = true;
 
-    for (const apiKeyAttempt of potentialApiKeys) {
+    async function attemptApiCall(apiKey: string, keyType: 'user' | 'admin', adminKeyId?: string): Promise<boolean> {
       try {
-        console.log(`Attempting API call with ${apiKeyAttempt.type} key...`);
-        const genAI = new GoogleGenerativeAI(apiKeyAttempt.key);
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          // safetySettings: [...] // Consider if consistent safety settings are needed here
-        });
-
-        // Using startChat as in previous version, can be switched to generateContent if preferred
-        const chat = model.startChat({
-          generationConfig,
-          history: [{ role: "user", parts: [{ text: prompt }] }],
-        });
+        console.log(`Attempting AI call with ${keyType} key...`);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const chat = model.startChat({ generationConfig, history: [{ role: "user", parts: [{ text: prompt }] }] });
         const genResult = await chat.sendMessage("generate");
         const aiResponse = genResult.response;
         const aiText = aiResponse.text();
@@ -168,58 +115,98 @@ export async function POST(request: NextRequest) {
               emoji: aiResult.emoji || defaultResult.emoji,
               subtasks: aiResult.subtasks || defaultResult.subtasks,
             };
-            // Ensure scores are within 1-20 range if provided
             if (result.speedScore < 1) result.speedScore = 1; if (result.speedScore > 20) result.speedScore = 20;
             if (result.importanceScore < 1) result.importanceScore = 1; if (result.importanceScore > 20) result.importanceScore = 20;
 
-            success = true;
-            console.log(`Successfully processed task with ${apiKeyAttempt.type} key.`);
-
-            if (apiKeyAttempt.type === 'admin' && apiKeyAttempt.id) {
-              // Optional: Update last_used_at for admin key (fire and forget)
-              supabase.from('admin_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyAttempt.id)
-                .then(({ error }) => {
-                  if (error) console.warn(`Failed to update last_used_at for admin key ${apiKeyAttempt.id}:`, error.message);
-                });
+            usedKeyType = keyType;
+            console.log(`Successfully processed task with ${keyType} key.`);
+            if (keyType === 'admin' && adminKeyId) {
+              supabase.from('admin_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', adminKeyId)
+                .then(({ error }) => { if (error) console.warn(`Failed to update last_used_at for admin key ${adminKeyId}:`, error.message); });
             }
-            break; // Exit loop on success
+            return true;
           } else {
-            lastError = new Error("No JSON object found in AI response.");
-            console.warn(`No JSON object found in AI response using ${apiKeyAttempt.type} key. Raw text: ${aiText.substring(0, 100)}...`);
+            console.warn(`No JSON object found in AI response using ${keyType} key. Raw text: ${aiText.substring(0, 100)}...`);
+            throw new Error("No JSON object found in AI response."); // Treat as failure for this key
           }
         } else {
-          lastError = new Error("AI response text was empty.");
-          console.warn(`AI response text was empty using ${apiKeyAttempt.type} key.`);
+          console.warn(`AI response text was empty using ${keyType} key.`);
+          throw new Error("AI response text was empty."); // Treat as failure for this key
         }
       } catch (apiError: any) {
-        lastError = apiError;
-        console.warn(`Gemini API call failed for ${apiKeyAttempt.type} key (ID: ${apiKeyAttempt.id || 'N/A'}):`, apiError.message);
-
-        // Specific errors that might warrant stopping immediately vs. trying next key
-        if (apiError.message && apiError.message.includes('SAFETY')) {
-          // If a safety error occurs, it's prompt-related, not key-related. Stop.
-          return NextResponse.json({ error: "Content blocked due to safety settings.", details: apiError.message }, { status: 400 });
+        console.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'}):`, apiError.message);
+        if (apiError.message && (apiError.message.includes('API key not valid') || apiError.message.includes('API key is invalid') || apiError.message.includes('quota'))) {
+          if (keyType === 'user') {
+            console.log("User API key failed with auth/quota error. Will attempt admin keys.");
+            attemptUserKey = false; // Mark that user key failed due to auth, so we don't use it again (for this request)
+            return false; // Indicate failure, allowing fallback
+          }
+          // If admin key fails with auth/quota, just try next admin key
+          return false;
         }
-        // Add other conditions here if certain errors are non-retryable with other keys
-        // e.g., invalid prompt structure, though the current prompt is static.
+        // For other errors (safety, model, network), throw to stop further attempts with other keys.
+        // Unless it's a specific non-auth related error that should allow fallback (e.g. temporary server error on Google's side)
+        // For now, any non-auth error with user key will stop the process.
+        // And any non-auth error with an admin key will also stop (as it's likely not key-specific)
+        throw apiError; // Rethrow to be caught by the outer try/catch or stop iteration
       }
     }
 
-    if (!success) {
-      console.error("All API key attempts failed. Last error:", lastError?.message || "Unknown error");
-      // Return default result or an error message if AI processing was critical
-      if (autoRanking || autoSubtasks) { // If AI features were expected
-         return NextResponse.json({ error: "Unable to process the request using AI at the moment. Please try again later.", details: lastError?.message }, { status: 503 });
+    if (userApiKey && attemptUserKey) {
+      try {
+        success = await attemptApiCall(userApiKey, 'user');
+      } catch (error: any) { // Catch errors re-thrown by attemptApiCall if they are non-auth related
+        console.error(`AI processing failed with user key due to non-auth error: ${error.message}`);
+        // If error is safety related or other non-key specific issue
+        if (error.message && error.message.includes('SAFETY')) {
+          return NextResponse.json({ error: "Content blocked due to safety settings.", details: error.message }, { status: 400 });
+        }
+        // For other non-auth errors with user key, we might not want to try admin keys.
+        // For now, we will stop if user key fails with a non-auth error.
+        return NextResponse.json({ error: "AI processing failed with user API key.", details: error.message }, { status: 500 });
       }
-      // If AI features were not strictly critical, could return defaultResult here.
-      // However, the earlier check for no keys + (autoRanking || autoSubtasks) implies AI is desired.
-      result = defaultResult; // Fallback to default if no AI processing succeeded but was not critical
     }
 
-    // Merge with default results for any parts that AI didn't provide or if AI failed but defaults are acceptable
-    // This logic is now more integrated into the success block and fallback for `result`.
-    // If AI was successful, `result` is populated. If not, and AI was critical, an error is returned.
-    // If AI was not critical and failed, `result` would be `defaultResult`.
+    if (!success) { // If user key was not available, or failed with auth error, or user key attempt was skipped
+      console.log("User key not used or failed with auth error, attempting admin keys.");
+      const { data: adminKeysData, error: adminKeysError } = await supabase
+        .from("admin_api_keys")
+        .select("id, api_key")
+        .eq("is_active", true);
+
+      if (adminKeysError) {
+        console.error("Error fetching admin API keys:", adminKeysError);
+      }
+
+      if (adminKeysData && adminKeysData.length > 0) {
+        for (let i = adminKeysData.length - 1; i > 0; i--) { // Shuffle
+          const j = Math.floor(Math.random() * (i + 1));
+          [adminKeysData[i], adminKeysData[j]] = [adminKeysData[j], adminKeysData[i]];
+        }
+
+        for (const adminKey of adminKeysData) {
+          try {
+            success = await attemptApiCall(adminKey.api_key, 'admin', adminKey.id);
+            if (success) break;
+          } catch (error: any) { // Catch errors re-thrown by attemptApiCall if they are non-auth related for an admin key
+             console.error(`AI processing failed with admin key ${adminKey.id} due to non-auth error: ${error.message}`);
+             if (error.message && error.message.includes('SAFETY')) {
+               return NextResponse.json({ error: "Content blocked due to safety settings.", details: error.message }, { status: 400 });
+             }
+             // If one admin key fails with a non-auth error, it's likely others will too. Stop.
+             return NextResponse.json({ error: "AI processing failed with an admin API key.", details: error.message }, { status: 500 });
+          }
+        }
+      }
+    }
+
+    if (!success && (autoRanking || autoSubtasks)) {
+      console.error("All API key attempts (user and admin) failed or no keys available.");
+      return NextResponse.json({ error: "Unable to process the request using AI at the moment. No working API key found or all attempts failed." }, { status: 503 });
+    } else if (!success) {
+      // AI features were not critical, or no AI features requested, and no success (though this path should be covered by early exit)
+      result = defaultResult; // Fallback to default if AI processing was desired but failed, and it's not critical enough to error out
+    }
 
     return NextResponse.json(result);
   } catch (error: any) {

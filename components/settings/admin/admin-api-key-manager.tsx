@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -60,7 +60,18 @@ const AdminApiKeyManager = () => {
   const [newKeyTestResult, setNewKeyTestResult] = useState<'success' | 'error' | null>(null);
 
   const [showKeyMap, setShowKeyMap] = useState<Record<string, boolean>>({});
+  const toastIdRef = useRef<string | number | undefined>(undefined);
 
+
+  // Cleanup for the toast potentially created by handleTestExistingApiKey
+  useEffect(() => {
+    return () => {
+      if (toastIdRef.current) {
+        toast.dismiss(toastIdRef.current);
+        toastIdRef.current = undefined;
+      }
+    };
+  }, []);
 
   const fetchAdminApiKeys = useCallback(async () => {
     setIsLoading(true);
@@ -252,7 +263,11 @@ const AdminApiKeyManager = () => {
 
   const handleTestExistingApiKey = async (apiKey: string) => {
     if (!apiKey) return;
-    const toastId = toast.loading('Testing API key...');
+    // Clear any previous toast ID from this specific action
+    if (toastIdRef.current) {
+      toast.dismiss(toastIdRef.current);
+    }
+    toastIdRef.current = toast.loading('Testing API key...');
     try {
       const response = await fetch('/api/test-gemini', {
         method: 'POST',
@@ -261,13 +276,17 @@ const AdminApiKeyManager = () => {
       });
       const result = await response.json();
       if (response.ok && result.success) {
-        toast.success('API Key is valid!', { id: toastId });
+        toast.success('API Key is valid!', { id: toastIdRef.current });
       } else {
-        toast.error(result.error || 'Failed to validate API key.', { id: toastId });
+        toast.error(result.error || 'Failed to validate API key.', { id: toastIdRef.current });
       }
     } catch (error) {
-       toast.error(error instanceof Error ? error.message : 'An unknown error occurred during test.', { id: toastId });
+       toast.error(error instanceof Error ? error.message : 'An unknown error occurred during test.', { id: toastIdRef.current });
     }
+    // It's generally good practice to clear the ref if the toast's lifecycle is fully managed by success/error/dismiss here,
+    // but the unmount cleanup is the primary safety net.
+    // For this specific case, the toast is updated (not kept loading indefinitely), so auto-clearing ref might not be needed
+    // unless another action could pre-emptively dismiss it. The unmount cleanup is the most robust.
   };
 
 
