@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const { title, description, autoRanking, autoSubtasks, userId } = await request.json()
 
     const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createClient(cookieStore)
 
     // 1. API Key List Management
     const potentialApiKeys: { key: string; type: 'user' | 'admin'; id?: string }[] = [];

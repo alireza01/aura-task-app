@@ -1,11 +1,11 @@
 // API route to fetch the current user's role
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types';
 
 export async function GET(request: Request) {
-  const supabase = createRouteHandlerClient<Database>({ cookies });
+  const supabase = createClient(cookies());
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
