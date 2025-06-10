@@ -3,33 +3,12 @@ import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-// Helper function to check if user is admin
-// This should ideally be a shared utility. For now, defined here.
-async function isAdmin(supabase: SupabaseClient<Database>): Promise<boolean> {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    console.error('Auth error or no user:', userError);
-    return false;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('user_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    console.error('Error fetching user profile or profile not found:', profileError?.message);
-    return false;
-  }
-  return profile.role === 'admin';
-}
+import { checkAdminRole } from '@/lib/auth/utils';
 
 export async function GET(request: Request) {
   const supabase = createClient(cookies());
 
-  if (!(await isAdmin(supabase))) {
+  if (!(await checkAdminRole(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
   }
 

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Edit3, Trash2, FolderOpen } from "lucide-react"
-import type { TaskGroup, User, UserSettings } from "@/types" // GuestUser removed
+import type { TaskGroup, User, UserSettings } from "@/types"
 import GroupFormModal from "./group-form-modal"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -18,7 +18,6 @@ import { createClient } from "@/lib/supabase/client"
 interface GroupContextMenuProps {
   group: TaskGroup
   user: User | null
-  // guestUser: GuestUser | null, // Removed
   settings: UserSettings | null
   onGroupsChange: () => void
   taskCount?: number
@@ -28,7 +27,6 @@ interface GroupContextMenuProps {
 export default function GroupContextMenu({
   group,
   user,
-  // guestUser, // Removed
   settings,
   onGroupsChange,
   taskCount = 0,
@@ -76,7 +74,6 @@ export default function GroupContextMenu({
 
       <GroupFormModal
         user={user}
-        // guestUser={guestUser} // Removed
         settings={settings}
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}

@@ -7,14 +7,13 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Plus, Edit3 } from "lucide-react"
-import type { Task, TaskGroup, UserSettings, User, GuestUser, Tag } from "@/types"
+import type { Task, TaskGroup, UserSettings, User, Tag } from "@/types"
 import type { TaskFormData } from "@/types"
 import TaskForm from "@/components/tasks/task-form"
 // import { useLocalStorage } from "@/hooks/use-local-storage" // Removed
 
 interface TaskFormModalProps {
   user: User | null
-  // guestUser: GuestUser | null, // Removed
   groups: TaskGroup[]
   tags: Tag[]
   settings: UserSettings | null
@@ -27,7 +26,6 @@ interface TaskFormModalProps {
 
 export default function TaskFormModal({
   user,
-  // guestUser, // Removed
   groups,
   tags,
   settings,
@@ -201,18 +199,17 @@ export default function TaskFormModal({
             description: "وظیفه جدید با موفقیت ایجاد شد.",
           })
         }
-      } else {
-        // This 'else' block was for local storage operations when user is not available (e.g. guestUser)
-        // Since we are removing guestUser and localTasks, this block should be removed.
-        // If there's no 'user' (Supabase user, including anonymous), we should not attempt to save.
-        // Or, this path should ideally not be hit if AppInitializer ensures a user (anonymous or real) always exists.
-        console.warn("Attempted to save task without a user session. This should not happen.");
-        showToast("خطا: کاربر نامعتبر", {
-          description: "برای ذخیره وظیفه، لطفاً ابتدا وارد شوید یا از حالت مهمان استفاده کنید.",
-          duration: 5000,
-          className: "bg-red-500 text-white",
+      }
+      // Removed guest user logic block here
+      // If there's no 'user' (Supabase user, including anonymous), we should not attempt to save.
+      // This path should ideally not be hit if AppInitializer ensures a user (anonymous or real) always exists.
+      // Or if UI prevents action. For safety, we can add a check:
+      else if (!user) {
+         console.warn("Attempted to save task without a user session. Task save aborted.");
+        showToast("خطا: عدم شناسایی کاربر", {
+          description: "امکان ذخیره وظیفه بدون کاربر معتبر وجود ندارد. لطفاً وارد شوید.",
+          variant: "destructive",
         });
-        // Early exit if no user, to prevent calling onTaskSaved() etc. for a failed operation.
         setLoading(false);
         return;
       }
@@ -267,7 +264,6 @@ export default function TaskFormModal({
             >
               <TaskForm
                 user={user}
-                // guestUser={guestUser} // Removed
                 groups={groups}
                 tags={tags}
                 settings={settings}

@@ -14,7 +14,7 @@ import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
 import ThemeSelector from "@/components/settings/theme-selector"
 import { AccountActions } from "@/components/settings/account-actions"
 import AdminSettingsSection from "@/components/settings/admin" // Added import
-import type { UserSettings, GuestUser, UserProfile } from "@/types"
+import type { UserSettings, UserProfile } from "@/types"
 
 interface SettingsPanelProps {
   user: User | null

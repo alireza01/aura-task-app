@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sparkles, Clock, Star, Plus, Loader2 } from "lucide-react"
-import type { Task, TaskGroup, UserSettings, User, Tag } from "@/types" // GuestUser removed from types
+import type { Task, TaskGroup, UserSettings, User, Tag } from "@/types"
 import SubTaskManager from "@/components/tasks/subtask-manager"
 import { cn } from "@/lib/utils"
 
@@ -36,7 +36,6 @@ type TaskFormData = z.infer<typeof taskFormSchema>
 
 interface TaskFormProps {
   user: User | null // User is now always a Supabase User (or null if not loaded/logged in)
-  // guestUser: GuestUser | null // Removed
   groups: TaskGroup[]
   tags: Tag[]
   settings: UserSettings | null
@@ -50,7 +49,6 @@ interface TaskFormProps {
 
 export default function TaskForm({
   user,
-  // guestUser, // Removed
   groups,
   tags,
   settings,
