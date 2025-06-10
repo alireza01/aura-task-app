@@ -1,9 +1,11 @@
+// app/layout.tsx
 import type React from "react"
 import type { Metadata } from "next"
 import { GuestSessionManager } from '@/components/auth/guest-session-manager'
 import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'
 import { ThemeProvider } from "@/components/theme/theme-provider"
 import { Toaster } from "sonner"
+import { SupabaseProvider } from "@/components/auth/supabase-provider" // <-- IMPORT
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -33,12 +35,19 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <GuestSessionManager />
-        <GuestMergeHandler />
-        <ThemeProvider defaultTheme="default">
-          {children}
-          <Toaster richColors position="top-right" />
-        </ThemeProvider>
+        {/* GuestSessionManager and GuestMergeHandler might also benefit from being inside SupabaseProvider
+            if they internally rely on useUser or other context-dependent hooks,
+            though useUser is the one causing the immediate error.
+            Let's place them inside for consistency.
+        */}
+        <SupabaseProvider> {/* <-- WRAPPER START */}
+          <GuestSessionManager />
+          <GuestMergeHandler />
+          <ThemeProvider defaultTheme="default">
+            {children}
+            <Toaster richColors position="top-right" />
+          </ThemeProvider>
+        </SupabaseProvider> {/* <-- WRAPPER END */}
       </body>
     </html>
   )

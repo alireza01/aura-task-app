@@ -12,7 +12,7 @@ import { X } from "lucide-react"
 import ApiKeyManager from "@/components/settings/api-key-manager"
 import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
 import ThemeSelector from "@/components/settings/theme-selector"
-import AccountActions from "@/components/settings/account-actions"
+import { AccountActions } from "@/components/settings/account-actions"
 import AdminSettingsSection from "@/components/settings/admin" // Added import
 import type { UserSettings, GuestUser } from "@/types"
 
