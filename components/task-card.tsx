@@ -1,252 +1,213 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import type { Task, Subtask } from "@/types" // Added Subtask type
-import { Clock, Star, ChevronDown, ChevronUp, MoreHorizontal, Edit, Trash2, GripVertical } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion" // Added AnimatePresence
+import React, { useState, useMemo } from 'react';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { Task, Subtask, Tag, TaskGroup } from '@/types'; // UserSettings might be needed from store
+
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useGroupStore } from '@/stores/groupStore'; // To get group details like name/emoji
+import { useTaskStore } from '@/stores/taskStore'; // For subtask actions
+
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import SubtaskManager from '@/components/tasks/subtask-manager'; // Will also need refactoring
+import { Edit3, Trash2, GripVertical, ChevronDown, ChevronUp, MessageSquare, CalendarDays, Zap, AlertTriangle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator'; // Assuming it's still present
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface TaskCardProps {
-  task: Task
-  onComplete: (taskId: string, completed: boolean) => Promise<void> // Modified to pass taskId and completed status
-  onUpdate: () => void
-  onEdit?: (task: Task) => void
-  onDelete?: (taskId: string) => void
+  task: Task;
+  user: SupabaseUser | null; // For permission checks or UI variations
+  // Callbacks connected to store actions by parent
+  onEditTask: () => void;
+  onDeleteTask: () => void;
+  onCompleteChange: (completed: boolean) => void;
+
+  // Props for DND if this card itself is made draggable (passed by DraggableTaskCard)
+  attributes?: Partial<React.HTMLAttributes<HTMLElement>>;
+  listeners?: Partial<React.HTMLAttributes<HTMLElement>>;
+  transform?: { x: number; y: number; scaleX?: number; scaleY?: number; } | null; // from dnd-kit, corrected scaleY typo
+  transition?: string | null; // from dnd-kit
+  isDragging?: boolean;
 }
 
-export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskCardProps) {
-  const [showSubtasks, setShowSubtasks] = useState(false)
-  const [completingSubtask, setCompletingSubtask] = useState<string | null>(null)
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+export default function TaskCard({
+  task,
+  user,
+  onEditTask,
+  onDeleteTask,
+  onCompleteChange,
+  attributes,
+  listeners,
+  transform,
+  transition,
+  isDragging,
+}: TaskCardProps) {
 
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const userSettings = useSettingsStore((state) => state.userSettings);
+  const getGroupById = (groupId: string | null) => useGroupStore.getState().groups.find(g => g.id === groupId);
 
-  const handleCompleteTask = async (checked: boolean) => {
-    await onComplete(task.id, checked)
+  // Subtask actions from taskStore
+  const { addSubtask, updateSubtask, deleteSubtask, toggleSubtaskCompleted } = useTaskStore.getState();
+
+  const [expanded, setExpanded] = useState(false); // For description and subtasks
+
+  const group = useMemo(() => task.group_id ? getGroupById(task.group_id) : null, [task.group_id, getGroupById]);
+
+  const handleToggleCompleted = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation(); // Prevent card click or other events
+    onCompleteChange(!task.completed);
+  };
+
+  // Style for DND transform, applied by the DraggableTaskCard wrapper usually.
+  // If TaskCard itself is the direct draggable target, this is where it would be used.
+  // However, DraggableTaskCard now applies this to its div. So, this might not be needed here.
+  // For safety, if transform is passed, apply it.
+  const cardStyle = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scaleX(${transform.scaleX || 1}) scaleY(${transform.scaleY || 1})`, transition } : {};
+  if (isDragging) {
+    // cardStyle.opacity = 0.5; // Example: make it semi-transparent when dragging
+    // cardStyle.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)';
   }
 
-  const completeSubtask = async (subtaskId: string) => {
-    if (!supabaseClient) return
-    setCompletingSubtask(subtaskId)
-    const originalSubtasks = task.subtasks || []
-
-    // Optimistic update
-    const updatedSubtasks = originalSubtasks.map((st) =>
-      st.id === subtaskId ? { ...st, completed: true, completed_at: new Date().toISOString() } : st,
-    )
-    // This requires the parent to update the task prop, which TaskDashboard's realtime will do.
-    // For immediate visual feedback, we might need a local state for subtasks if onUpdate is slow.
-    // However, since TaskDashboard now has realtime, onUpdate should trigger a quick re-render.
-
-    try {
-      const { error } = await supabaseClient
-        .from("subtasks")
-        .update({
-          completed: true,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", subtaskId)
-      if (error) throw error
-      onUpdate() // Trigger parent to re-fetch/update tasks
-    } catch (error) {
-      console.error("Error completing subtask:", error)
-      // Revert optimistic update if needed, but with realtime, the server state will quickly correct it.
-      onUpdate() // Ensure UI is consistent with server on error
-    } finally {
-      setCompletingSubtask(null)
-    }
-  }
-
-  const subtasks = task.subtasks || []
-  const completedSubtasks = subtasks.filter((st) => st.completed).length
-  const tags = task.tags || []
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-      <Card className="task-card border-0 bg-card shadow-sm hover:shadow-md">
-        <div className="p-4">
+    <Card
+        className={cn(
+            "group relative cursor-default shadow-sm hover:shadow-md transition-shadow duration-200",
+            task.completed && "bg-muted/40 opacity-70",
+            // isDragging handled by DraggableTaskCard wrapper now for opacity/shadow
+        )}
+        // style and attributes are applied by DraggableTaskCard to its wrapper div
+        // {...attributes} // Only if this Card is the direct sortable node
+    >
+      <CardHeader className="p-4">
+        <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="cursor-grab active:cursor-grabbing">
-              <GripVertical className="h-5 w-5 text-muted-foreground" />
-            </div>
-
-            <div className="flex-1 min-w-0 flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={task.completed}
-                  onCheckedChange={handleCompleteTask} // Changed to handleCompleteTask
-                  className="h-5 w-5 rounded-full data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                  aria-label={`Mark task "${task.title}" as complete`}
-                />
-                <div className="flex-1 min-w-0">
-                  {/* Task Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {task.emoji && <span className="text-lg">{task.emoji}</span>}
-                        <motion.h3
-                          className={cn(
-                            "font-medium text-foreground hover:text-primary transition-colors cursor-pointer relative",
-                            task.completed && "line-through-animated",
-                          )}
-                          onClick={() => onEdit && onEdit(task)}
-                          animate={{
-                            opacity: task.completed ? 0.7 : 1,
-                          }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          {task.title}
-                        </motion.h3>
-                      </div>
-
-                      {task.description && (
-                        <motion.p
-                          className={cn(
-                            "text-sm text-muted-foreground mb-3 leading-relaxed",
-                            task.completed && "line-through-animated",
-                          )}
-                          animate={{
-                            opacity: task.completed ? 0.7 : 1,
-                          }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          {task.description}
-                        </motion.p>
-                      )}
-
-                      {/* Tags */}
-                      {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-3">
-                          {tags.map((tag) => (
-                            <Badge
-                              key={tag.id}
-                              variant="outline"
-                              className={cn("tag rounded-full px-2 py-0 text-xs font-normal", `tag-${tag.color}`)}
-                            >
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* AI Scores */}
-                      {(task.speed_score || task.importance_score) && (
-                        <div className="flex items-center gap-2 mb-3">
-                          {task.speed_score && (
-                            <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[0.7rem]">
-                              <Clock className="h-3 w-3" />
-                              <span>{task.speed_score}/20</span>
-                            </Badge>
-                          )}
-                          {task.importance_score && (
-                            <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[0.7rem]">
-                              <Star className="h-3 w-3" />
-                              <span>{task.importance_score}/20</span>
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Subtasks Summary */}
-                      {subtasks.length > 0 && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                              {completedSubtasks}/{subtasks.length}
-                            </span>
-                            <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-primary transition-all duration-300"
-                                style={{ width: `${(completedSubtasks / subtasks.length) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowSubtasks(!showSubtasks)}
-                            className="h-7 w-7 p-0 rounded-full"
-                          >
-                            {showSubtasks ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit && onEdit(task)}>
-                    <Edit className="ml-2 h-4 w-4" />
-                    <span>ویرایش</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onDelete && onDelete(task.id)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="ml-2 h-4 w-4" />
-                    <span>حذف</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <Checkbox
+              id={`task-${task.id}-checkbox`}
+              checked={task.completed}
+              onCheckedChange={() => onCompleteChange(!task.completed)}
+              onClick={handleToggleCompleted}
+              aria-label={`Mark task ${task.completed ? 'incomplete' : 'complete'}`}
+              className="mt-1 shrink-0 border-muted-foreground data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+            />
+            <div className="flex-grow">
+              <CardTitle
+                className={cn(
+                    "text-base font-semibold leading-tight",
+                    task.completed && "line-through text-muted-foreground"
+                )}
+              >
+                {task.emoji && <span className="mr-2 text-lg">{task.emoji}</span>}
+                {task.title}
+              </CardTitle>
+              {group && (
+                <Badge variant="outline" className="mt-1.5 text-xs py-0.5 px-1.5 font-normal">
+                  {group.emoji} {group.name}
+                </Badge>
+              )}
             </div>
           </div>
 
-          {/* Subtasks */}
-          {showSubtasks && subtasks.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-3 space-y-2 border-t border-border pt-3"
-            >
-              {subtasks.map((subtask) => (
-                <div key={subtask.id} className="flex items-center gap-3">
-                  <Checkbox
-                    checked={subtask.completed}
-                    onCheckedChange={() => completeSubtask(subtask.id)}
-                    disabled={completingSubtask === subtask.id}
-                    className="h-4 w-4 rounded-sm"
-                  />
-                  <motion.span
-                    className={cn("text-sm flex-1 relative", subtask.completed && "line-through-animated")}
-                    animate={{
-                      opacity: subtask.completed ? 0.7 : 1,
-                    }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {subtask.title}
-                  </motion.span>
-                </div>
-              ))}
-            </motion.div>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {listeners && ( // Drag Handle passed from DraggableTaskCard
+                <Button variant="ghost" size="icon" className="cursor-grab h-7 w-7 group-hover:opacity-100 opacity-50 transition-opacity" {...listeners} aria-label="Drag task">
+                    <GripVertical className="h-4 w-4" />
+                </Button>
+            )}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 group-hover:opacity-100 opacity-50 transition-opacity" aria-label="Task actions">
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-36 p-1">
+                <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={onEditTask}>Edit Task</Button>
+                <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-red-500 hover:text-red-600" onClick={onDeleteTask}>Delete Task</Button>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
-      </Card>
-    </motion.div>
-  )
+      </CardHeader>
+
+      {(task.description || (task.subtasks && task.subtasks.length > 0) || task.tags?.length || task.due_date || task.speed_score || task.importance_score ) && (
+        <CardContent className="px-4 pb-3 pt-0">
+            {(task.description || (task.subtasks && task.subtasks.length > 0)) && (
+                 <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)} className="w-full justify-start text-xs text-muted-foreground -ml-2 mb-1 h-auto py-1">
+                    {expanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+                    {expanded ? "Show Less" : "Show More"}
+                 </Button>
+            )}
+
+            <AnimatePresence>
+            {expanded && (
+                <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                >
+                    {task.description && (
+                        <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap break-words">{task.description}</p>
+                    )}
+                    {/* Ensure subtasks is an array before checking length and mapping */}
+                    {Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
+                        <div className="mt-2 mb-3">
+                        <SubtaskManager
+                            parentTaskId={task.id}
+                            subtasks={task.subtasks}
+                            onAddSubtask={async (title) => addSubtask(task.id, { title }, user?.id || null, null /* guestUser - subtasks for logged in */)}
+                            onUpdateSubtask={async (subtaskId, sUpdates) => updateSubtask(task.id, subtaskId, sUpdates, user?.id || null, null)}
+                            onDeleteSubtask={async (subtaskId) => deleteSubtask(task.id, subtaskId, user?.id || null, null)}
+                            onToggleSubtask={async (subtaskId, sCompleted) => toggleSubtaskCompleted(task.id, subtaskId, sCompleted, user?.id || null, null)}
+                            disabled={task.completed}
+                        />
+                        </div>
+                    )}
+                </motion.div>
+            )}
+            </AnimatePresence>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
+                {task.due_date && (
+                    <div className="flex items-center gap-1">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        <span>{new Date(task.due_date).toLocaleDateString()}</span>
+                    </div>
+                )}
+                {task.speed_score && userSettings?.show_ai_scores && (
+                    <div className="flex items-center gap-1" title={`Speed Score: ${task.speed_score}`}>
+                        <Zap className="h-3.5 w-3.5 text-blue-500" />
+                        <span>{task.speed_score}</span>
+                    </div>
+                )}
+                {task.importance_score && userSettings?.show_ai_scores && (
+                    <div className="flex items-center gap-1" title={`Importance Score: ${task.importance_score}`}>
+                        <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                        <span>{task.importance_score}</span>
+                    </div>
+                )}
+            </div>
+            {/* Ensure tags is an array before checking length and mapping */}
+            {Array.isArray(task.tags) && task.tags.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {task.tags.map((tag) => (
+                  <Badge key={tag.id} variant="secondary" style={{ backgroundColor: tag.color ? `${tag.color}20` : undefined, borderColor: tag.color ? `${tag.color}80` : undefined, color: tag.color ? tag.color : undefined }} className="py-0.5 px-1.5 text-xs font-normal">
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+        </CardContent>
+      )}
+       <CardFooter className="px-4 py-2 text-xs text-muted-foreground/70 border-t mt-2" style={{ display: task.created_at ? 'block' : 'none' }}>
+        Created: {task.created_at ? new Date(task.created_at).toLocaleDateString() : 'N/A'}
+      </CardFooter>
+    </Card>
+  );
 }

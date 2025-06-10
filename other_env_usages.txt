@@ -1,0 +1,2 @@
+3:  echo "Other usages of process.env.NEXT_PUBLIC_ found:"
+7:  echo "No other usages of process.env.NEXT_PUBLIC_ found that need updating."

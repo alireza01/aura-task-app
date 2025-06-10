@@ -25,3 +25,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Typed Environment Variables (Auto-generated, specific values are in .env* files)
+src/env.mjs

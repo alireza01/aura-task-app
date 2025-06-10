@@ -1,0 +1,130 @@
+./middleware.ts:10:    /*
+./middleware.ts:16:     */
+./postcss.config.mjs:1:/** @type {import('postcss-load-config').Config} */
+./tsconfig.json:24:      "@/*": ["./*"]
+./tsconfig.json:27:  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+./next.config.mjs:1:/** @type {import('next').NextConfig} */
+./tailwind.config.ts:6:    "./pages/**/*.{ts,tsx}",
+./tailwind.config.ts:7:    "./components/**/*.{ts,tsx}",
+./tailwind.config.ts:8:    "./app/**/*.{ts,tsx}",
+./tailwind.config.ts:9:    "./src/**/*.{ts,tsx}",
+./app/globals.css:77:  /* Alireza Theme */
+./app/globals.css:101:  /* Neda Theme */
+./app/globals.css:133:    bottom: 50%; /* Adjust to center the line */
+./app/globals.css:134:    height: 1px; /* Thickness of the line */
+./app/globals.css:135:    background-color: currentColor; /* Inherit text color */
+./app/globals.css:162:  /* Custom cursor for Alireza theme */
+./app/globals.css:187:  /* Neda theme specific styles */
+./app/globals.css:229:  /* Hide scrollbar for horizontal scrolling */
+./app/globals.css:238:  /* Glass morphism utilities */
+./app/globals.css:254:  /* Alireza theme specific styles */
+./app/globals.css:272:  /* Enhanced focus styles */
+./app/globals.css:279:  /* Loading animations */
+./app/globals.css:299:  /* Custom scrollbar */
+./app/globals.css:312:  /* Theme-specific scrollbars */
+./app/globals.css:321:  /* Neda theme animations */
+./app/globals.css:384:/* Framer Motion overrides */
+./app/globals.css:389:/* Premium animations for Alireza theme */
+./app/globals.css:405:/* Sophisticated hover effects for Alireza */
+./app/globals.css:415:/* Bubbly effects for Neda theme */
+./hooks/use-debounce.ts:5:/**
+./hooks/use-debounce.ts:15: */
+./hooks/use-api-key-status.ts:9:/**
+./hooks/use-api-key-status.ts:20: */
+./hooks/use-api-key-status.ts:39:  /**
+./hooks/use-api-key-status.ts:42:   */
+./hooks/use-api-key-status.ts:69:  /**
+./hooks/use-api-key-status.ts:72:   */
+./components/theme/theme-provider.tsx:25:/**
+./components/theme/theme-provider.tsx:27: */
+./components/theme/theme-provider.tsx:29:  /** The child components to be rendered within the theme context. */
+./components/theme/theme-provider.tsx:31:  /** The default theme to apply if no user preference is found. Defaults to "default". */
+./components/theme/theme-provider.tsx:35:/**
+./components/theme/theme-provider.tsx:42: */
+./components/theme/theme-provider.tsx:48:    /**
+./components/theme/theme-provider.tsx:50:     */
+./components/theme/theme-provider.tsx:58:  /**
+./components/theme/theme-provider.tsx:61:   */
+./components/theme/theme-provider.tsx:70:      {/* Conditionally render CustomCursor only for the "alireza" theme. */}
+./components/theme/neda-group-bubble.tsx:153:        {/* Floating particles effect */}
+./components/theme/neda-group-bubble.tsx:185:        {/* Delete button (appears on hover) */}
+./components/theme/neda-group-bubble.tsx:206:        {/* Ripple effect on click */}
+./components/ui/sidebar.tsx:224:        {/* This is what handles the sidebar gap on desktop */}
+./components/task-dashboard.tsx:661:          {/* Greeting Skeleton */}
+./components/task-dashboard.tsx:667:          {/* Add Task Button Skeleton */}
+./components/task-dashboard.tsx:670:          {/* TaskGroupsBubbles Skeleton */}
+./components/task-dashboard.tsx:675:            <Skeleton className="h-10 w-10 rounded-full" /> {/* Add group button */}
+./components/task-dashboard.tsx:678:          {/* Tabs and Filters Skeleton */}
+./components/task-dashboard.tsx:693:          {/* TaskList and StatsDashboard Skeleton */}
+./components/task-dashboard.tsx:731:      {/* Main Content */}
+./components/task-dashboard.tsx:744:        {/* Task Creation */}
+./components/task-dashboard.tsx:750:        {/* Conditional rendering for no groups */}
+./components/task-dashboard.tsx:772:            {/* Optionally, if there are tasks but no groups, mention that TaskList will show them */}
+./components/task-dashboard.tsx:792:            {/* Tabs and Filters */}
+./components/task-dashboard.tsx:842:                      {/* Search */}
+./components/task-dashboard.tsx:854:                      {/* Group Filter */}
+./components/task-dashboard.tsx:868:                      {/* Status Filter */}
+./components/task-dashboard.tsx:879:                      {/* Priority Filter */}
+./components/task-dashboard.tsx:891:                      {/* Tag Filter */}
+./components/task-dashboard.tsx:905:                      {/* Clear Filters */}
+./components/task-dashboard.tsx:986:      {/* Modals */}
+./components/header.tsx:75:        {/* Logo */}
+./components/header.tsx:102:        {/* Search Bar */}
+./components/header.tsx:125:        {/* Actions */}
+./components/header.tsx:132:          {/* Theme Toggle */}
+./components/header.tsx:153:          {/* Settings */}
+./components/header.tsx:170:          {/* User Menu */}
+./components/task-groups-bubbles.tsx:112:          {/* All Tasks Bubble */}
+./components/task-groups-bubbles.tsx:138:          {/* Group Bubbles */}
+./components/task-groups-bubbles.tsx:198:      {/* Create Group Modal */}
+./components/archive-view.tsx:185:                        {/* AI Scores */}
+./components/stats-dashboard.tsx:83:      {/* Main Stats */}
+./components/stats-dashboard.tsx:109:      {/* Completion Rate */}
+./components/stats-dashboard.tsx:131:      {/* Today's Tasks */}
+./components/stats-dashboard.tsx:149:      {/* Performance Metrics */}
+./components/stats-dashboard.tsx:184:      {/* Quick Actions */}
+./components/task-list.tsx:212:      {/* Task Groups */}
+./components/task-list.tsx:215:      {/* Ungrouped Tasks */}
+./components/task-list.tsx:218:      {/* Archive Section */}
+./components/task-list.tsx:278:      {/* Empty State: Only show if there are no active tasks AND no completed tasks either (truly empty) */}
+./components/tags-modal.tsx:181:          {/* Add New Tag */}
+./components/tags-modal.tsx:234:          {/* Existing Tags */}
+./components/tags-modal.tsx:326:          {/* Close Button */}
+./components/settings/account-actions.tsx:177:      {/* Sign Out Confirmation Dialog */}
+./components/settings/account-actions.tsx:193:      {/* Delete Account Confirmation Dialog */}
+./components/settings/theme-selector.tsx:116:                {/* Theme Preview */}
+./components/task-card.tsx:96:                  {/* Task Header */}
+./components/task-card.tsx:131:                      {/* Tags */}
+./components/task-card.tsx:146:                      {/* AI Scores */}
+./components/task-card.tsx:164:                      {/* Subtasks Summary */}
+./components/task-card.tsx:218:          {/* Subtasks */}
+./components/groups/group-form-modal.tsx:326:              {/* AI Emoji Assignment Info */}
+./components/tasks/subtask-manager.tsx:61:        {/* AI Notice */}
+./components/tasks/subtask-manager.tsx:75:        {/* Existing Subtasks List */}
+./components/tasks/subtask-manager.tsx:114:        {/* Add New Subtask */}
+./components/tasks/subtask-manager.tsx:143:        {/* Empty State */}
+./components/tasks/task-form.tsx:158:      {/* Title */}
+./components/tasks/task-form.tsx:189:      {/* Description */}
+./components/tasks/task-form.tsx:210:      {/* Emoji */}
+./components/tasks/task-form.tsx:230:      {/* Group Selection */}
+./components/tasks/task-form.tsx:257:      {/* Tags */}
+./components/tasks/task-form.tsx:285:      {/* AI Settings */}
+./components/tasks/task-form.tsx:316:      {/* Manual Scoring */}
+./components/tasks/task-form.tsx:362:      {/* Subtasks */}
+./components/tasks/task-form.tsx:381:      {/* Actions */}
+./components/auth/api-key-setup-modal.tsx:186:            {/* Step Progress Indicator */}
+./components/auth/api-key-setup-modal.tsx:203:            {/* Step Content */}
+./components/auth/api-key-setup-modal.tsx:238:            {/* Navigation Footer */}
+./components/auth/api-key-setup-modal.tsx:365:      {/* Visual Aid Placeholder */}
+./components/auth/api-key-setup-modal.tsx:418:      {/* Visual Aid Placeholders */}
+./components/auth/api-key-setup-modal.tsx:508:        {/* Feedback Messages */}
+./components/auth/api-key-setup-modal.tsx:540:        {/* Help Text */}
+./components/task-group.tsx:12:  /** The task group object containing id, name, and emoji. */
+./components/task-group.tsx:14:  /** An array of tasks belonging to this group. */
+./components/task-group.tsx:16:  /** Whether the task group is currently expanded to show tasks. */
+./components/task-group.tsx:18:  /** Callback function to toggle the expanded state of the group. */
+./components/task-group.tsx:20:  /**
+./components/task-group.tsx:24:   */
+./components/task-group.tsx:26:  /** Callback function to trigger a refresh of tasks, typically after an update. */
+./components/task-group.tsx:30:/**
+./components/task-group.tsx:36: */

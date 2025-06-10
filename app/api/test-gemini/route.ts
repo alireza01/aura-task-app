@@ -1,3 +1,4 @@
+import { env } from '@/src/env.mjs';
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {

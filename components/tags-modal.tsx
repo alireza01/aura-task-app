@@ -1,336 +1,215 @@
 "use client"
 
-import type React from "react"
+import React, { useState, useEffect } from 'react';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { GuestUser, Tag } from '@/types';
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import type { Tag, User, GuestUser } from "@/types"
-import { TagIcon, Plus, Trash2, Edit3 } from "lucide-react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
-import { toast } from "sonner"
-import { motion, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { useTagStore } from '@/stores/tagStore';
+import { useUIStore } from '@/stores/uiStore';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
+import { TagIcon, PlusCircle, Edit3, Trash2, Check, X as CloseIcon, Palette } from 'lucide-react';
+import { CirclePicker, ColorResult } from 'react-color'; // Example color pickers
 
 interface TagsModalProps {
-  user: User | null
-  guestUser: GuestUser | null
-  tags: Tag[]
-  onClose: () => void
-  onTagsChange: () => void
+  user: SupabaseUser | null;
+  guestUser: GuestUser | null;
+  // tags prop and onTagsChange, onClose removed
 }
 
-const tagColors = [
-  { name: "قرمز", value: "red" as const },
-  { name: "سبز", value: "green" as const },
-  { name: "آبی", value: "blue" as const },
-  { name: "زرد", value: "yellow" as const },
-  { name: "بنفش", value: "purple" as const },
-  { name: "نارنجی", value: "orange" as const },
-]
+// Default colors for CirclePicker
+const defaultColors = [
+  "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3",
+  "#03a9f4", "#00bcd4", "#009688", "#4caf50", "#8bc34a", "#cddc39",
+  "#ffeb3b", "#ffc107", "#ff9800", "#ff5722", "#795548", "#607d8b",
+  "#FFFFFF", "#000000" // Added white and black
+];
 
-export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange }: TagsModalProps) {
-  const [newTagName, setNewTagName] = useState("")
-  const [newTagColor, setNewTagColor] = useState<Tag["color"]>("blue")
-  const [editingTag, setEditingTag] = useState<Tag | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [localTags, setLocalTags] = useLocalStorage<Tag[]>("aura-tags", [])
-  const showToast = toast
-  const supabaseClient = createClient()
 
-  const handleAddTag = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newTagName.trim()) return
+export default function TagsModal({ user, guestUser }: TagsModalProps) {
+  const { toast } = useToast();
 
-    setLoading(true)
+  // UI Store
+  const { isTagsModalOpen, closeTagsModal } = useUIStore((state) => ({
+    isTagsModalOpen: state.isTagsModalOpen,
+    closeTagsModal: state.closeTagsModal,
+  }));
 
-    try {
-      const newTag: Tag = {
-        id: `tag-${Date.now()}`,
-        user_id: user?.id || guestUser?.id || "guest",
-        name: newTagName.trim(),
-        color: newTagColor,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
+  // Tag Store
+  const tags = useTagStore((state) => state.tags);
+  const fetchTags = useTagStore((state) => state.fetchTags);
+  const addTag = useTagStore((state) => state.addTag);
+  const updateTag = useTagStore((state) => state.updateTag);
+  const deleteTag = useTagStore((state) => state.deleteTag);
+  const errorUpdatingTag = useTagStore((state) => state.errorUpdatingTag);
+  const isLoadingTags = useTagStore((state) => state.isLoadingTags);
 
-      if (user && supabaseClient) {
-        const { data, error } = await supabaseClient
-          .from("tags")
-          .insert({
-            user_id: user.id,
-            name: newTag.name,
-            color: newTag.color,
-          })
-          .select()
-          .single()
 
-        if (error) throw error
-        newTag.id = data.id
-      } else {
-        setLocalTags([...localTags, newTag])
-      }
+  // Local state for form inputs
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#607d8b'); // Default color
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [showColorPickerFor, setShowColorPickerFor] = useState<string | null>(null); // 'new' or tag.id
 
-      setNewTagName("")
-      setNewTagColor("blue")
-      onTagsChange()
-
-      showToast("برچسب اضافه شد", {
-        description: `برچسب "${newTag.name}" با موفقیت ایجاد شد.`,
-      })
-    } catch (error) {
-      console.error("خطا در ایجاد برچسب:", error)
-      showToast("خطا در ایجاد برچسب", {
-        description: "مشکلی در ایجاد برچسب رخ داد.",
-        duration: 3000,
-        className: "bg-red-500 text-white",
-      })
-    } finally {
-      setLoading(false)
+  // Fetch tags when modal opens or user changes (if not already loaded by TaskDashboard)
+  // This ensures the modal always has fresh tag data if opened independently.
+  useEffect(() => {
+    if (isTagsModalOpen) {
+      // Tags might already be fetched by TaskDashboard.
+      // Calling fetchTags here again is fine; store action should prevent redundant calls if data exists.
+      fetchTags(user?.id || null, guestUser);
     }
-  }
+  }, [isTagsModalOpen, user, guestUser, fetchTags]);
 
-  const handleEditTag = async (tag: Tag) => {
-    if (!editingTag) return
-
-    setLoading(true)
-
-    try {
-      if (user && supabaseClient) {
-        const { error } = await supabaseClient
-          .from("tags")
-          .update({
-            name: editingTag.name,
-            color: editingTag.color,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", tag.id)
-
-        if (error) throw error
-      } else {
-        const updatedTags = localTags.map((t) =>
-          t.id === tag.id ? { ...editingTag, updated_at: new Date().toISOString() } : t,
-        )
-        setLocalTags(updatedTags)
-      }
-
-      setEditingTag(null)
-      onTagsChange()
-
-      showToast("برچسب به‌روزرسانی شد", {
-        description: "تغییرات با موفقیت ذخیره شد.",
-      })
-    } catch (error) {
-      console.error("خطا در به‌روزرسانی برچسب:", error)
-      showToast("خطا در به‌روزرسانی", {
-        description: "مشکلی در ذخیره تغییرات رخ داد.",
-        duration: 3000,
-        className: "bg-red-500 text-white",
-      })
-    } finally {
-      setLoading(false)
+  const handleAddTag = async () => {
+    if (!newTagName.trim()) {
+      toast({ title: "Tag name cannot be empty", variant: "destructive" });
+      return;
     }
-  }
+    const createdTag = await addTag({ name: newTagName.trim(), color: newTagColor }, user?.id || null, guestUser);
+    if (createdTag) {
+      toast({ title: "Tag Added", description: `Tag "${createdTag.name}" created.` });
+      setNewTagName('');
+      setNewTagColor('#607d8b'); // Reset color
+    } else {
+      toast({ title: "Error Adding Tag", description: errorUpdatingTag || "Unknown error", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateTag = async () => {
+    if (!editingTag || !editingTag.name.trim()) {
+      toast({ title: "Tag name cannot be empty", variant: "destructive" });
+      return;
+    }
+    const updated = await updateTag(editingTag.id, { name: editingTag.name.trim(), color: editingTag.color }, user?.id || null, guestUser);
+    if (updated) {
+      toast({ title: "Tag Updated" });
+      setEditingTag(null);
+    } else {
+      toast({ title: "Error Updating Tag", description: errorUpdatingTag || "Unknown error", variant: "destructive" });
+    }
+  };
 
   const handleDeleteTag = async (tagId: string) => {
-    setLoading(true)
-
-    try {
-      if (user && supabaseClient) {
-        const { error } = await supabaseClient.from("tags").delete().eq("id", tagId)
-        if (error) throw error
-      } else {
-        const updatedTags = localTags.filter((t) => t.id !== tagId)
-        setLocalTags(updatedTags)
-      }
-
-      onTagsChange()
-
-      showToast("برچسب حذف شد", {
-        description: "برچسب با موفقیت حذف شد.",
-      })
-    } catch (error) {
-      console.error("خطا در حذف برچسب:", error)
-      showToast("خطا در حذف برچسب", {
-        description: "مشکلی در حذف برچسب رخ داد.",
-        duration: 3000,
-        className: "bg-red-500 text-white",
-      })
-    } finally {
-      setLoading(false)
+    // Add confirmation dialog in real app
+    const success = await deleteTag(tagId, user?.id || null, guestUser);
+    if (success) {
+      toast({ title: "Tag Deleted" });
+      if (editingTag?.id === tagId) setEditingTag(null); // Clear editing state if deleted
+    } else {
+      toast({ title: "Error Deleting Tag", description: errorUpdatingTag || "Unknown error", variant: "destructive" });
     }
+  };
+
+  const startEditing = (tag: Tag) => {
+    setEditingTag({ ...tag }); // Clone to edit locally
+    setShowColorPickerFor(null); // Close any open color pickers
+  };
+
+  const cancelEditing = () => {
+    setEditingTag(null);
+  };
+
+  const handleColorChangeComplete = (color: ColorResult, tagIdOrNew: string) => {
+    if (tagIdOrNew === 'new') {
+        setNewTagColor(color.hex);
+    } else if (editingTag && editingTag.id === tagIdOrNew) {
+        setEditingTag({ ...editingTag, color: color.hex });
+    }
+    setShowColorPickerFor(null); // Close picker after selection
+  };
+
+  if (!isTagsModalOpen) {
+    return null;
   }
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="glass-card border-0 max-w-md">
+    <Dialog open={isTagsModalOpen} onOpenChange={(isOpen) => !isOpen && closeTagsModal()}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
-            <motion.div initial={{ rotate: 0 }} animate={{ rotate: 360 }} transition={{ duration: 0.5 }}>
-              <TagIcon className="w-5 h-5 text-primary" />
-            </motion.div>
-            مدیریت برچسب‌ها
-          </DialogTitle>
+          <DialogTitle className="flex items-center"><TagIcon className="mr-2 h-5 w-5" /> مدیریت برچسب‌ها</DialogTitle>
         </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Add New Tag */}
-          <motion.form
-            onSubmit={handleAddTag}
-            className="space-y-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="tagName" className="text-sm font-medium">
-                نام برچسب
-              </Label>
-              <Input
-                id="tagName"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="نام برچسب جدید..."
-                className="glass border-0 focus:ring-2 focus:ring-primary/20"
-              />
+        <div className="py-4 space-y-4">
+          {/* Add New Tag Form */}
+          <div className="flex items-center gap-2 p-2 border rounded-lg">
+            <Input
+              placeholder="نام برچسب جدید"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              className="flex-grow"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+            />
+            <div className="relative">
+                <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setShowColorPickerFor(showColorPickerFor === 'new' ? null : 'new')}>
+                    <Palette className="h-4 w-4" style={{ color: newTagColor }} />
+                </Button>
+                {showColorPickerFor === 'new' && (
+                    <div className="absolute z-50 mt-1 right-0 sm:left-0 sm:right-auto"> {/* Position picker */}
+                        <div className="fixed inset-0 " onClick={() => setShowColorPickerFor(null)} /> {/* Overlay to close */}
+                        <CirclePicker colors={defaultColors} color={newTagColor} onChangeComplete={(color) => handleColorChangeComplete(color, 'new')} />
+                    </div>
+                )}
             </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">رنگ برچسب</Label>
-              <div className="flex flex-wrap gap-2">
-                {tagColors.map((color) => (
-                  <motion.button
-                    key={color.value}
-                    type="button"
-                    onClick={() => setNewTagColor(color.value)}
-                    className={cn(
-                      "px-3 py-1 rounded-full text-xs font-medium transition-all duration-200",
-                      `tag-${color.value}`,
-                      newTagColor === color.value ? "ring-2 ring-primary ring-offset-2" : "hover:scale-105",
-                    )}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {color.name}
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading || !newTagName.trim()}
-              className="w-full glass-button bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              افزودن برچسب
+            <Button onClick={handleAddTag} size="icon" className="h-9 w-9" disabled={!newTagName.trim()}>
+              <PlusCircle className="h-5 w-5" />
             </Button>
-          </motion.form>
-
-          {/* Existing Tags */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">برچسب‌های موجود</Label>
-
-            <AnimatePresence>
-              {tags.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  <TagIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">هنوز برچسبی ایجاد نکرده‌اید</p>
-                </motion.div>
-              ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                  {tags.map((tag, index) => (
-                    <motion.div
-                      key={tag.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="flex items-center justify-between glass-card p-3"
-                    >
-                      {editingTag?.id === tag.id ? (
-                        <div className="flex-1 flex items-center gap-2">
-                          <Input
-                            value={editingTag.name}
-                            onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
-                            className="flex-1 h-8 text-sm"
-                          />
-                          <div className="flex gap-1">
-                            {tagColors.map((color) => (
-                              <button
-                                key={color.value}
-                                type="button"
-                                onClick={() => setEditingTag({ ...editingTag, color: color.value })}
-                                className={cn(
-                                  "w-6 h-6 rounded-full border-2 transition-all",
-                                  `bg-${color.value}-200 dark:bg-${color.value}-800`,
-                                  editingTag.color === color.value
-                                    ? "border-primary scale-110"
-                                    : "border-transparent hover:scale-105",
-                                )}
-                              />
-                            ))}
-                          </div>
-                          <div className="flex gap-1">
-                            <Button size="sm" onClick={() => handleEditTag(tag)} className="h-8 w-8 p-0">
-                              ✓
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingTag(null)}
-                              className="h-8 w-8 p-0"
-                            >
-                              ✕
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <Badge className={cn("tag", `tag-${tag.color}`, "border-0")}>{tag.name}</Badge>
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingTag(tag)}
-                              className="h-8 w-8 p-0 hover:bg-primary/10"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteTag(tag.id)}
-                              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </AnimatePresence>
           </div>
 
-          {/* Close Button */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <Button onClick={onClose} variant="outline" className="w-full glass-button">
-              بستن
-            </Button>
-          </motion.div>
+          {/* List of Existing Tags */}
+          {isLoadingTags && <p className="text-sm text-muted-foreground text-center">در حال بارگذاری برچسب‌ها...</p>}
+          {!isLoadingTags && tags.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">هنوز برچسبی ایجاد نشده است.</p>
+          )}
+          <div className="max-h-60 overflow-y-auto space-y-2 custom-scrollbar pr-1">
+            {tags.map((tag) => (
+              <div key={tag.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/50">
+                {editingTag?.id === tag.id ? (
+                  <>
+                    <Input
+                      value={editingTag.name}
+                      onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
+                      className="h-8 flex-grow mr-1"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateTag(); if (e.key === 'Escape') cancelEditing();}}
+                    />
+                    <div className="relative mr-1">
+                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setShowColorPickerFor(showColorPickerFor === tag.id ? null : tag.id)}>
+                            <Palette className="h-4 w-4" style={{ color: editingTag.color || '#000000' }} />
+                        </Button>
+                        {showColorPickerFor === tag.id && (
+                             <div className="absolute z-50 mt-1 right-0">
+                                <div className="fixed inset-0 " onClick={() => setShowColorPickerFor(null)} />
+                                <CirclePicker colors={defaultColors} color={editingTag.color || '#000000'} onChangeComplete={(color) => handleColorChangeComplete(color, tag.id)} />
+                            </div>
+                        )}
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={handleUpdateTag} className="h-8 w-8"><Check className="h-4 w-4 text-green-500"/></Button>
+                    <Button variant="ghost" size="icon" onClick={cancelEditing} className="h-8 w-8"><CloseIcon className="h-4 w-4 text-gray-500"/></Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center">
+                      <span style={{ backgroundColor: tag.color || '#ccc' }} className="w-3 h-3 rounded-full mr-2 shrink-0 border"></span>
+                      <span className="text-sm">{tag.name}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Button variant="ghost" size="icon" onClick={() => startEditing(tag)} className="h-7 w-7"><Edit3 className="h-4 w-4"/></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(tag.id)} className="h-7 w-7"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">بستن</Button>
+          </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
