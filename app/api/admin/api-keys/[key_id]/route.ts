@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types'; // Assuming this path is correct
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { serverLogger } from '@/lib/logger';
 
 const updateApiKeySchema = z.object({
   name: z.string().max(255).optional().nullable(), // Allow null to remove name
@@ -16,7 +17,7 @@ const updateApiKeySchema = z.object({
 async function isAdmin(supabase: SupabaseClient<Database>): Promise<boolean> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
-    console.error('Auth error or no user:', userError);
+    serverLogger.error('Auth error or no user', {}, userError);
     return false;
   }
 
@@ -27,7 +28,7 @@ async function isAdmin(supabase: SupabaseClient<Database>): Promise<boolean> {
     .single();
 
   if (profileError || !profile) {
-    console.error('Error fetching user profile or profile not found:', profileError?.message);
+    serverLogger.error('Error fetching user profile or profile not found', { userId: user.id }, profileError);
     return false;
   }
   return profile.role === 'admin';
@@ -53,7 +54,7 @@ export async function PUT(
     const validation = updateApiKeySchema.safeParse(body);
 
     if (!validation.success) {
-      console.error("API Validation Error:", validation.error.format());
+      serverLogger.error("API Validation Error", { key_id }, validation.error);
       return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
@@ -80,7 +81,7 @@ export async function PUT(
       .single();
 
     if (error) {
-      console.error(`Error updating admin API key ${key_id}:`, error);
+      serverLogger.error(`Error updating admin API key ${key_id}`, { key_id }, error);
       if (error.code === 'PGRST116') { // "Query returned no rows" - key_id not found
         return NextResponse.json({ error: 'API Key not found.' }, { status: 404 });
       }
@@ -94,7 +95,7 @@ export async function PUT(
     return NextResponse.json(data);
 
   } catch (e: unknown) {
-    console.error(`Unexpected error in PUT /api/admin/api-keys/${key_id}:`, e);
+    serverLogger.error(`Unexpected error in PUT /api/admin/api-keys/${key_id}`, { key_id }, e as Error);
     if (e instanceof SyntaxError) { // SyntaxError is a specific type of Error
         return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
     }
@@ -125,7 +126,7 @@ export async function DELETE(
       .eq('id', key_id);
 
     if (error) {
-      console.error(`Error deleting admin API key ${key_id}:`, error);
+      serverLogger.error(`Error deleting admin API key ${key_id}`, { key_id }, error);
       return NextResponse.json({ error: error.message || 'Failed to delete API key' }, { status: 500 });
     }
 
@@ -135,7 +136,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'API Key deleted successfully.' }, { status: 200 }); // Or 204 No Content
   } catch (e: unknown) {
-    console.error(`Unexpected error in DELETE /api/admin/api-keys/${key_id}:`, e);
+    serverLogger.error(`Unexpected error in DELETE /api/admin/api-keys/${key_id}`, { key_id }, e as Error);
     const errorMessage = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: errorMessage || 'An unexpected error occurred' }, { status: 500 });
   }

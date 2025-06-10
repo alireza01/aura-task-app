@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai"; // HarmCategory, Har
 import { z } from "zod";
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
+import { serverLogger } from '@/lib/logger';
 
 const testGeminiSchema = z.object({
   apiKey: z.string().min(1),
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     const validation = testGeminiSchema.safeParse(body);
 
     if (!validation.success) {
-      console.error("API Validation Error:", validation.error.format());
+      serverLogger.error("API Validation Error", { body }, validation.error);
       return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "API key test failed: Empty response from model." }, { status: 400 });
       }
     } catch (apiError: any) {
-      console.error("Gemini API test call failed:", apiError);
+      serverLogger.error("Gemini API test call failed", { apiKey }, apiError);
       if (apiError.message) {
         if (apiError.message.includes('API key not valid')) {
           return NextResponse.json({ error: "Invalid API key. Please check the key and try again." }, { status: 400 });
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) { // Catch errors from request.json() or other unexpected issues
-    console.error("Error in test-gemini route:", error);
+    serverLogger.error("Error in test-gemini route", {}, error);
     return NextResponse.json({ error: error.message || "Failed to test API key due to an unexpected error." }, { status: 500 });
   }
 }

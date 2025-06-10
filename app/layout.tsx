@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"; // Guide adds this
 import AppInitializer from "@/components/auth/app-initializer";
 import GuestSessionManager from "@/components/auth/guest-session-manager";
 import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'; // From existing
+import ErrorBoundary from "@/components/error-boundary";
 
 export const metadata = {
   title: "Aura", // Guide's title (temporary)
@@ -38,7 +39,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <ErrorBoundary>{children}</ErrorBoundary>
             <Toaster richColors position="top-right" /> {/* Toaster from existing */}
           </ThemeProvider>
         </TooltipProvider>
