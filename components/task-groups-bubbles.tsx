@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import type { TaskGroup, User, GuestUser } from "@/types"
+import type { TaskGroup, User } from "@/types" // GuestUser removed
 import { Plus } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -15,10 +15,11 @@ import { useTheme } from "@/components/theme/theme-provider"
 import GroupFormModal from "./groups/group-form-modal"
 import GroupContextMenu from "./groups/group-context-menu"
 import NedaGroupBubble from "./theme/neda-group-bubble"
+import ConfirmationDialog from "@/components/ui/confirmation-dialog"; // Added import
 
 interface TaskGroupsBubblesProps {
   user: User | null
-  guestUser: GuestUser | null
+  // guestUser: GuestUser | null, // Removed
   groups: TaskGroup[]
   selectedGroup: string | null
   onGroupSelect: (groupId: string | null) => void
@@ -29,7 +30,7 @@ interface TaskGroupsBubblesProps {
 
 export default function TaskGroupsBubbles({
   user,
-  guestUser,
+  // guestUser, // Removed
   groups,
   selectedGroup,
   onGroupSelect,
@@ -39,9 +40,25 @@ export default function TaskGroupsBubbles({
 }: TaskGroupsBubblesProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null)
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false); // Added state
+  const [groupToDelete, setGroupToDelete] = useState<TaskGroup | null>(null); // Added state
   const showToast = toast
   const { theme } = useTheme()
   const supabaseClient = createClient() // Initialize Supabase client directly
+
+  const promptDeleteGroup = (group: TaskGroup) => { // Added function
+    const taskCount = getTaskCountForGroup(group.id);
+    if (taskCount > 0) {
+      showToast("امکان حذف گروه وجود ندارد", {
+        description: "ابتدا تمام وظایف این گروه را حذف یا به گروه دیگری منتقل کنید.",
+        duration: 3000,
+        className: "bg-red-500 text-white",
+      });
+      return;
+    }
+    setGroupToDelete(group);
+    setIsConfirmDeleteDialogOpen(true);
+  };
 
   const handleDragOver = (e: React.DragEvent, groupId: string) => {
     e.preventDefault()
@@ -61,28 +78,28 @@ export default function TaskGroupsBubbles({
     setDragOverGroup(null)
   }
 
-  const handleDeleteGroup = async (groupId: string) => {
+  const handleActualDeleteGroup = async (groupId: string) => { // Renamed and confirm removed
     try {
-      // Always use Supabase for deletion. RLS will ensure user can only delete their own groups.
       if (!supabaseClient) {
         console.error("Supabase client not available for delete group operation in bubbles.")
         throw new Error("Supabase client not available.")
       }
-      const { error } = await supabaseClient.from("task_groups").delete().eq("id", groupId)
-      if (error) throw error
-      onGroupsChange()
+      const { error } = await supabaseClient.from("task_groups").delete().eq("id", groupId);
+      if (error) throw error;
+      onGroupsChange();
       showToast("گروه حذف شد", {
         description: "گروه با موفقیت حذف شد.",
-      })
-    } catch (error) {
-      console.error("خطا در حذف گروه:", error)
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("خطا در حذف گروه:", errorMessage);
       showToast("خطا در حذف گروه", {
-        description: "مشکلی در حذف گروه رخ داد.",
+        description: `مشکلی در حذف گروه رخ داد: ${errorMessage}`,
         duration: 3000,
         className: "bg-red-500 text-white",
-      })
+      });
     }
-  }
+  };
 
   return (
     <div className="mb-6">
@@ -145,7 +162,7 @@ export default function TaskGroupsBubbles({
                   isSelected={selectedGroup === group.id}
                   taskCount={getTaskCountForGroup(group.id)}
                   onClick={() => onGroupSelect(group.id)}
-                  onDelete={() => handleDeleteGroup(group.id)}
+                  onDeleteRequest={() => promptDeleteGroup(group)} // Changed prop
                   onDragOver={(e) => handleDragOver(e, group.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, group.id)}
@@ -178,10 +195,12 @@ export default function TaskGroupsBubbles({
                 <GroupContextMenu
                   group={group}
                   user={user}
-                  guestUser={guestUser}
+                  // guestUser={guestUser} // Removed
                   settings={null}
                   taskCount={getTaskCountForGroup(group.id)}
                   onGroupsChange={onGroupsChange}
+                  // Pass promptDeleteGroup to GroupContextMenu
+                  onDeleteRequest={() => promptDeleteGroup(group)}
                 />
               )}
             </motion.div>
@@ -195,9 +214,31 @@ export default function TaskGroupsBubbles({
         onClose={() => setShowCreateModal(false)}
         onGroupSaved={onGroupsChange}
         user={user}
-        guestUser={guestUser}
+        // guestUser={guestUser} // Removed
         settings={null}
       />
+
+      {/* Confirmation Dialog for Deleting Group */}
+      {groupToDelete && (
+        <ConfirmationDialog
+          isOpen={isConfirmDeleteDialogOpen}
+          onClose={() => {
+            setIsConfirmDeleteDialogOpen(false);
+            setGroupToDelete(null);
+          }}
+          onConfirm={() => {
+            if (groupToDelete) {
+              handleActualDeleteGroup(groupToDelete.id);
+              setIsConfirmDeleteDialogOpen(false);
+              setGroupToDelete(null);
+            }
+          }}
+          title={`حذف گروه "${groupToDelete.name}"`}
+          description="آیا مطمئن هستید که می‌خواهید این گروه را حذف کنید؟ این عمل قابل بازگشت نیست. وظایف داخل گروه حذف نخواهند شد ولی بدون گروه باقی می‌مانند." // Updated description
+          confirmText="حذف گروه"
+          cancelText="انصراف"
+        />
+      )}
     </div>
   )
 }

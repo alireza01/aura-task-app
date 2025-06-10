@@ -64,6 +64,11 @@ export default function TaskForm({
   const [subtasks, setSubtasks] = useState<string[]>([])
   const [aiProcessing, setAiProcessing] = useState(false)
   const canUseAI = user && settings?.gemini_api_key // This logic remains correct
+  const [supabaseClient, setSupabaseClient] = useState<any>(null); // Added for Supabase client
+
+  useEffect(() => {
+    setSupabaseClient(createClient()); // Initialize Supabase client
+  }, []);
 
   const {
     register,
@@ -144,6 +149,50 @@ export default function TaskForm({
             const newAiSubtasks = aiData.subtasks.filter((st: string) => !subtasks.includes(st));
             finalData.subtasks = [...subtasks, ...newAiSubtasks];
           }
+
+          // Process AI-suggested tags
+          if (aiData.tags && Array.isArray(aiData.tags) && aiData.tags.length > 0 && user && supabaseClient && settings?.auto_tagging) {
+            const aiTagIds = [];
+            for (const tagName of aiData.tags) {
+              if (typeof tagName === 'string' && tagName.trim() !== '') {
+                let tagId = null;
+                const trimmedTagName = tagName.trim();
+
+                // Check if tag exists
+                const { data: existingTag, error: findError } = await supabaseClient
+                  .from("tags")
+                  .select("id")
+                  .eq("user_id", user.id)
+                  .eq("name", trimmedTagName)
+                  .single();
+
+                if (findError && findError.code !== 'PGRST116') { // PGRST116: row not found
+                  console.error("Error finding tag:", findError);
+                }
+
+                if (existingTag) {
+                  tagId = existingTag.id;
+                } else {
+                  // Create new tag if it doesn't exist
+                  const { data: newTag, error: createError } = await supabaseClient
+                    .from("tags")
+                    .insert({ user_id: user.id, name: trimmedTagName, color: 'blue' }) // Default color 'blue'
+                    .select("id")
+                    .single();
+
+                  if (createError) {
+                    console.error("Error creating new tag:", createError);
+                  } else if (newTag) {
+                    tagId = newTag.id;
+                  }
+                }
+                if (tagId) aiTagIds.push(tagId);
+              }
+            }
+            // Merge with manually selected tags, ensuring uniqueness
+            finalData.selectedTags = Array.from(new Set([...(finalData.selectedTags || []), ...aiTagIds]));
+          }
+
         }
       } catch (error) {
         console.error("خطا در پردازش هوش مصنوعی:", error)

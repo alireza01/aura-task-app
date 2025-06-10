@@ -19,12 +19,36 @@ export default function AppInitializer() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => { // Make callback async
         const user = session?.user ?? null;
         setUser(user);
+        let themeToApply = 'system'; // Default theme
 
-        const userTheme = user?.user_metadata?.theme ?? 'system';
-        applyTheme(userTheme);
+        if (user) {
+          try {
+            const { data: settings, error: settingsError } = await supabase
+              .from('user_settings')
+              .select('theme')
+              .eq('user_id', user.id)
+              .single();
+
+            if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: row not found
+              console.error('Error fetching theme from user_settings:', settingsError);
+            }
+
+            if (settings && settings.theme) {
+              themeToApply = settings.theme;
+            } else {
+              // Fallback to user_metadata
+              themeToApply = user.user_metadata?.theme ?? 'system';
+            }
+          } catch (e) {
+            console.error('Exception fetching theme:', e);
+            themeToApply = user.user_metadata?.theme ?? 'system'; // Fallback on error
+          }
+        }
+
+        applyTheme(themeToApply);
 
         if (!isInitialized) {
           setInitialized(true);
@@ -34,17 +58,35 @@ export default function AppInitializer() {
 
     // Initial check for session
     const checkInitialSession = async () => {
-      if (isInitialized) return; // Already initialized by onAuthStateChange or previous run
+      if (isInitialized) return;
 
-      const { data: { session } } = await supabase.auth.getSession(); // Use getSession for initial check
+      const { data: { session } } = await supabase.auth.getSession();
       let user = session?.user ?? null;
-      let themeToApply = 'system'; // Default
+      let themeToApply = 'system';
 
       if (user) {
         setUser(user);
-        themeToApply = user.user_metadata?.theme ?? 'system';
+        try {
+          const { data: settings, error: settingsError } = await supabase
+            .from('user_settings')
+            .select('theme')
+            .eq('user_id', user.id)
+            .single();
+
+          if (settingsError && settingsError.code !== 'PGRST116') {
+            console.error('Error fetching theme from user_settings on initial check:', settingsError);
+          }
+
+          if (settings && settings.theme) {
+            themeToApply = settings.theme;
+          } else {
+            themeToApply = user.user_metadata?.theme ?? 'system';
+          }
+        } catch (e) {
+          console.error('Exception fetching theme on initial check:', e);
+          themeToApply = user.user_metadata?.theme ?? 'system';
+        }
       } else {
-        // No active session, attempt anonymous sign-in
         try {
           const { data: anonSignInData, error: anonSignInError } = await supabase.auth.signInAnonymously();
           if (anonSignInError) {
@@ -53,8 +95,26 @@ export default function AppInitializer() {
           } else if (anonSignInData?.user) {
             user = anonSignInData.user;
             setUser(user);
-            // Anonymous users might not have a theme in metadata, defaults to 'system'
+            // Anonymous users likely won't have settings, use default or metadata if somehow set
+            // For anonymous, user_settings fetch might fail or return nothing, which is fine.
+            // Fallback to metadata or system default.
             themeToApply = user.user_metadata?.theme ?? 'system';
+            // Attempt to get from user_settings for anonymous user if there's a use case for it
+            // This is less likely for anonymous but included for completeness if such a flow exists
+            try {
+                const { data: anonSettings, error: anonSettingsError } = await supabase
+                    .from('user_settings')
+                    .select('theme')
+                    .eq('user_id', user.id) // user.id for anon user
+                    .single();
+                if (anonSettings && anonSettings.theme) {
+                    themeToApply = anonSettings.theme;
+                } else if (anonSettingsError && anonSettingsError.code !== 'PGRST116') {
+                    console.error('Error fetching theme for anon user:', anonSettingsError);
+                }
+            } catch(e) {
+                 console.error('Exception fetching theme for anon user:', e);
+            }
           }
         } catch (error) {
           console.error('Exception during anonymous sign-in:', error);

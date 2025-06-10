@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import type { Task, User, GuestUser } from "@/types"
+import type { Task, User } from "@/types" // GuestUser removed
 import { Archive, RotateCcw, Trash2, Calendar, Clock } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useLocalStorage } from "@/hooks/use-local-storage"
@@ -16,7 +16,7 @@ interface ArchiveViewProps {
   archivedTasks: Task[]
   onTasksChange: () => void
   isVisible: boolean
-  onToggle: () => void
+  onToggleVisibility: () => void // Renamed from onToggle
 }
 
 export default function ArchiveView({
@@ -24,7 +24,7 @@ export default function ArchiveView({
   archivedTasks,
   onTasksChange,
   isVisible,
-  onToggle,
+  onToggleVisibility, // Renamed from onToggle
 }: ArchiveViewProps) {
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const [loading, setLoading] = useState<string | null>(null)
@@ -131,7 +131,7 @@ export default function ArchiveView({
             <Archive className="w-5 h-5 text-muted-foreground" />
             <CardTitle className="text-muted-foreground">آرشیو ({archivedTasks.length} وظیفه تکمیل شده)</CardTitle>
           </div>
-          <Button variant="ghost" size="sm" onClick={onToggle} className="text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="sm" onClick={onToggleVisibility} className="text-muted-foreground hover:text-foreground">
             {isVisible ? "پنهان کردن" : "نمایش آرشیو"}
           </Button>
         </div>

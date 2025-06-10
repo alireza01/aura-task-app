@@ -5,8 +5,9 @@ import { createClient, SupabaseClient } from '@/lib/supabase/client';
 import type { User, Task, TaskGroup, UserSettings, Tag, UserProfile } from '@/types'; // UserProfile added
 import Header from '@/components/header';
 import TaskList from '@/components/task-list';
-import AddTaskModal from '@/components/add-task-modal';
-import EditTaskModal from '@/components/edit-task-modal';
+// import AddTaskModal from '@/components/add-task-modal'; // Removed
+// import EditTaskModal from '@/components/edit-task-modal'; // Removed
+import TaskFormModal from '@/components/tasks/task-form-modal'; // Added
 import SignInPromptModal from '@/components/signin-prompt-modal';
 import ApiKeySetup from '@/components/api-key-setup';
 import SettingsPanel from '@/components/settings/settings-panel';
@@ -25,10 +26,13 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { generateFractionalIndex } from '@/lib/utils';
 import TaskGroupsBubbles from '@/components/task-groups-bubbles';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocalStorage } from '@/hooks/use-local-storage'; // Added import
 
 interface TaskDashboardProps {
   user: User | null;
 }
+
+const GUEST_TASK_LIMIT = 5;
 
 export default function TaskDashboard({ user: initialUser }: TaskDashboardProps) {
   const [supabaseClient] = useState(() => createClient());
@@ -42,8 +46,10 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
 
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [showEditTask, setShowEditTask] = useState(false);
+  // const [showAddTask, setShowAddTask] = useState(false); // Removed
+  // const [showEditTask, setShowEditTask] = useState(false); // Removed
+  const [taskModalOpen, setTaskModalOpen] = useState(false); // Added
+  const [taskModalMode, setTaskModalMode] = useState<'add' | 'edit'>('add'); // Added
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [showApiKeySetup, setShowApiKeySetup] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -61,25 +67,8 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   const [filterPriority, setFilterPriority] = useState<"all" | "high" | "medium" | "low">("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
 
-  // const [hasShownSignInPrompt, setHasShownSignInPrompt] = useLocalStorage("has-shown-signin-prompt", false);
-  // Disabled useLocalStorage for hasShownSignInPrompt as it's not directly involved in guest conversion logic and to simplify.
-  // If it's needed, it can be re-enabled. For now, focusing on the core task.
-  const [hasShownSignInPrompt, _setHasShownSignInPrompt] = useState(false); // Temporarily use useState
-  const setHasShownSignInPrompt = (value: boolean) => {
-    // console.log("setHasShownSignInPrompt called with", value);
-    _setHasShownSignInPrompt(value);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem("has-shown-signin-prompt", JSON.stringify(value));
-    }
-  };
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedValue = localStorage.getItem("has-shown-signin-prompt");
-      if (storedValue) {
-        _setHasShownSignInPrompt(JSON.parse(storedValue));
-      }
-    }
-  }, []);
+  const [hasShownSignInPrompt, setHasShownSignInPrompt] = useLocalStorage("has-shown-signin-prompt", false);
+  // Removed manual useState, useEffect and custom setter for hasShownSignInPrompt
 
 
   const { toast } = useToast();
@@ -110,25 +99,14 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
     // A fallback would be to select only `subtasks(count)` or just `*` and handle counts differently or omit them.
     // For this subtask, we try the count syntax. If it fails in practice, schema/RPC would be needed.
     const { data, error } = await supabaseClient
-      .from("tasks")
-      .select("*, subtask_count:subtasks(count), tag_count:task_tags(count)") // Corrected tags to task_tags for count
+      .from("tasks_with_counts") // Querying the new view
+      .select("*") // Select all columns from the view (includes subtask_count and tag_count)
       .eq("user_id", currentUserId)
       .order("order_index", { ascending: true });
 
     if (error) {
-      console.error("Error loading tasks with counts:", error);
-      // Fallback to loading tasks without counts if the count query fails
-      const { data: fallbackData, error: fallbackError } = await supabaseClient
-        .from("tasks")
-        .select("*")
-        .eq("user_id", currentUserId)
-        .order("order_index", { ascending: true });
-      if (fallbackError) {
-        console.error("Error loading tasks (fallback):", fallbackError);
-        setTasks([]);
-      } else {
-        setTasks(fallbackData || []);
-      }
+      console.error("Error loading tasks from view tasks_with_counts:", error);
+      setTasks([]); // Set tasks to empty array on error
     } else {
       setTasks(data || []);
     }
@@ -294,21 +272,21 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
 
             // Condition 2: The current userProfile in state *is* marked as guest.
             // This implies the profile hasn't updated yet from the auth change.
-            const isCurrentProfileGuest = userProfile?.is_guest === true;
+            const isStaleProfileMarkedAsGuest = userProfile?.is_guest === true;
 
             // console.log("Guest conversion check:", {
             //   newAuthUserEmail: newAuthUser.email,
             //   isNewUserEmailGuest,
-            //   userProfileIsGuest: userProfile?.is_guest,
-            //   currentProfileUserId: userProfile?.user_id,
-            //   newAuthUserId: newAuthUser.id
+            //   userProfileIsGuest: userProfile?.is_guest, // This is the stale profile's state
+            //   currentProfileUserId: userProfile?.user_id, // Stale profile's user_id
+            //   newAuthUserId: newAuthUser.id // ID of the (potentially) newly registered user
             // });
 
-            // Ensure we are not trying to convert if the profile loaded is already for the new user and is_guest is false
-            // This can happen if profile reloads very quickly.
-            // The key is that the *profile we have in state* is still the guest one.
-            if (!isNewUserEmailGuest && isCurrentProfileGuest && userProfile?.user_id === newAuthUser.id) {
-              // console.log("Conditions met for calling /api/user/set-registered");
+            // The crucial part is that the API call will use the newAuthUser.id (implicitly via session)
+            // to update the correct user_profiles record. The client-side check here is mostly
+            // to ensure we *should* be making this call (i.e., user was guest, now isn't).
+            if (!isNewUserEmailGuest && isStaleProfileMarkedAsGuest) {
+              // console.log("Conditions met for calling /api/user/set-registered based on new email and stale guest profile state.");
               try {
                 const response = await fetch('/api/user/set-registered', {
                   method: 'POST',
@@ -627,11 +605,21 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
   useEffect(() => { applyFilters(); }, [applyFilters]);
 
   const handleAddTask = useCallback(() => {
-    if (user && isGuestUser(user, userProfile) && tasks.length >= 5 && !hasShownSignInPrompt) {
-      setShowSignInPrompt(true); setHasShownSignInPrompt(true);
-    } else { setShowAddTask(true); }
-  }, [user, userProfile, isGuestUser, tasks.length, hasShownSignInPrompt, setHasShownSignInPrompt]);
-  const handleEditTask = useCallback((task: Task) => { setTaskToEdit(task); setShowEditTask(true); }, []);
+    if (user && isGuestUser(user, userProfile) && tasks.length >= GUEST_TASK_LIMIT && !hasShownSignInPrompt) {
+      setShowSignInPrompt(true);
+      setHasShownSignInPrompt(true); // Ensure this state setter is correctly defined/imported if it's a custom hook
+    } else {
+      setTaskToEdit(null); // Clear any previous task to edit
+      setTaskModalMode('add');
+      setTaskModalOpen(true);
+    }
+  }, [user, userProfile, isGuestUser, tasks.length, hasShownSignInPrompt, setHasShownSignInPrompt]); // Added setHasShownSignInPrompt to deps if it's from useState
+
+  const handleEditTask = useCallback((task: Task) => {
+    setTaskToEdit(task);
+    setTaskModalMode('edit');
+    setTaskModalOpen(true);
+  }, []);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     if (!user?.id) return; const originalTasks = tasks; setTasks(prev => prev.filter(t => t.id !== taskId));
@@ -734,7 +722,10 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
         <main className="container pt-16 pb-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              {userProfile?.nickname ? `سلام، ${userProfile.nickname}` : (user && isGuestUser(user, userProfile) ? "سلام، مهمان" : `سلام${user?.user_metadata?.name ? "، " + user.user_metadata.name : (user?.email && !isGuestUser(user, userProfile) ? "، " + user.email.split('@')[0] : "")}`)}
+              سلام{userProfile?.nickname ? `، ${userProfile.nickname}` :
+                   (user?.user_metadata?.name && !isGuestUser(user, userProfile)) ? `، ${user.user_metadata.name}` :
+                   (user?.email && !isGuestUser(user, userProfile)) ? `، ${user.email.split('@')[0]}` :
+                   (isGuestUser(user, userProfile)) ? "، مهمان" : ""}
             </h1>
             <p className="text-muted-foreground">{filteredTasks.filter(t => !t.completed).length} وظیفه در انتظار انجام</p>
           </div>
@@ -773,8 +764,27 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
             </>
           )}
         </main>
-        {showAddTask && (<AddTaskModal user={user} groups={groups} tags={tags} settings={settings} onClose={() => setShowAddTask(false)} onTaskAdded={handleTaskAddedOrUpdated} />)}
-        {showEditTask && taskToEdit && (<EditTaskModal user={user} task={taskToEdit} groups={groups} tags={tags} settings={settings} onClose={() => { setShowEditTask(false); setTaskToEdit(null); }} onTaskUpdated={handleTaskAddedOrUpdated} />)}
+        {/* Consolidated TaskFormModal */}
+        <TaskFormModal
+          user={user}
+          // guestUser prop will be removed from TaskFormModal itself in a later step
+          guestUser={null} // Passing null as guestUser prop will be removed from TaskFormModal
+          groups={groups}
+          tags={tags}
+          settings={settings}
+          isOpen={taskModalOpen}
+          onClose={() => {
+            setTaskModalOpen(false);
+            setTaskToEdit(null); // Clear taskToEdit when modal closes
+          }}
+          onTaskSaved={() => {
+            handleTaskAddedOrUpdated(); // Refresh tasks list
+            setTaskModalOpen(false);
+            setTaskToEdit(null);
+          }}
+          taskToEdit={taskToEdit} // This will be null for 'add' mode
+          // initialTitle can be set if needed for 'add' mode, e.g. based on search query
+        />
         {showSignInPrompt && (<SignInPromptModal onClose={() => setShowSignInPrompt(false)} onSignIn={() => { setShowSignInPrompt(false);}} />)}
         {user && showApiKeySetup && (<ApiKeySetup onComplete={() => {setShowApiKeySetup(false); if(user?.id) loadSettings(user.id, user, userProfile);}} onSkip={() => setShowApiKeySetup(false)} />)}
         {showSettings && (<SettingsPanel user={user} profile={userProfile} settings={settings} isOpen={showSettings} onClose={() => setShowSettings(false)} onSettingsChange={handleSettingsChange} />)}

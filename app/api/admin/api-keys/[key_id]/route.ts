@@ -13,7 +13,7 @@ const updateApiKeySchema = z.object({
 });
 
 // Helper function to check if user is admin (can be refactored into a shared util if not already)
-async function isAdmin(supabase: SupabaseClient<Database>) {
+async function isAdmin(supabase: SupabaseClient<Database>): Promise<boolean> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     console.error('Auth error or no user:', userError);
@@ -93,12 +93,13 @@ export async function PUT(
 
     return NextResponse.json(data);
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(`Unexpected error in PUT /api/admin/api-keys/${key_id}:`, e);
-    if (e instanceof SyntaxError) {
+    if (e instanceof SyntaxError) { // SyntaxError is a specific type of Error
         return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
     }
-    return NextResponse.json({ error: e.message || 'An unexpected error occurred' }, { status: 500 });
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: errorMessage || 'An unexpected error occurred' }, { status: 500 });
   }
 }
 
@@ -133,8 +134,9 @@ export async function DELETE(
     }
 
     return NextResponse.json({ message: 'API Key deleted successfully.' }, { status: 200 }); // Or 204 No Content
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(`Unexpected error in DELETE /api/admin/api-keys/${key_id}:`, e);
-    return NextResponse.json({ error: e.message || 'An unexpected error occurred' }, { status: 500 });
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: errorMessage || 'An unexpected error occurred' }, { status: 500 });
   }
 }

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Edit3, Trash2, FolderOpen } from "lucide-react"
-import type { TaskGroup, User, GuestUser, UserSettings } from "@/types"
+import type { TaskGroup, User, UserSettings } from "@/types" // GuestUser removed
 import GroupFormModal from "./group-form-modal"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -18,68 +18,31 @@ import { createClient } from "@/lib/supabase/client"
 interface GroupContextMenuProps {
   group: TaskGroup
   user: User | null
-  guestUser: GuestUser | null
+  // guestUser: GuestUser | null, // Removed
   settings: UserSettings | null
   onGroupsChange: () => void
   taskCount?: number
+  onDeleteRequest: (group: TaskGroup) => void; // Added prop
 }
 
 export default function GroupContextMenu({
   group,
   user,
-  guestUser,
+  // guestUser, // Removed
   settings,
   onGroupsChange,
   taskCount = 0,
+  onDeleteRequest, // Added prop
 }: GroupContextMenuProps) {
   const [showEditModal, setShowEditModal] = useState(false)
-  const [loading, setLoading] = useState(false)
+  // const [loading, setLoading] = useState(false) // Loading state for delete will be handled by parent/dialog
   const showToast = toast
-  const supabase = createClient() // Initialize Supabase client directly
+  // const supabase = createClient() // Supabase client not needed here for delete
 
-  const handleDeleteGroup = async () => {
-    // The taskCount prop is used here directly.
-    if (taskCount > 0) {
-      showToast("امکان حذف گروه وجود ندارد", {
-        description: "ابتدا تمام وظایف این گروه را حذف یا به گروه دیگری منتقل کنید.",
-        duration: 3000,
-        className: "bg-red-500 text-white",
-      })
-      return
-    }
-
-    const confirmed = window.confirm(`آیا از حذف گروه "${group.name}" اطمینان دارید؟`)
-    if (!confirmed) return
-
-    setLoading(true)
-
-    try {
-      // Always use Supabase for deletion. RLS will ensure the user can only delete their own groups.
-      // user prop is not strictly needed for the delete call if RLS is set up for user_id.
-      // The supabase client must be available.
-      if (!supabase) {
-        console.error("Supabase client not available for delete operation.")
-        throw new Error("Supabase client not available.")
-      }
-      const { error } = await supabase.from("task_groups").delete().eq("id", group.id)
-      if (error) throw error
-
-      showToast("گروه حذف شد", {
-        description: `گروه "${group.name}" با موفقیت حذف شد.`,
-      })
-
-      onGroupsChange()
-    } catch (error) {
-      console.error("خطا در حذف گروه:", error)
-      showToast("خطا در حذف گروه", {
-        description: "مشکلی در حذف گروه رخ داد.",
-        duration: 3000,
-        className: "bg-red-500 text-white",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Local handleDeleteGroup is removed. Action is passed to parent via onDeleteRequest.
+  // The check for taskCount > 0 should ideally be done in the parent before showing the dialog,
+  // or the dialog itself could show this info. For now, onDeleteRequest will be called,
+  // and parent (TaskGroupsBubbles) already has a check in promptDeleteGroup.
 
   return (
     <>
@@ -101,8 +64,8 @@ export default function GroupContextMenu({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={handleDeleteGroup}
-            disabled={loading || taskCount > 0}
+            onClick={() => onDeleteRequest(group)} // Call onDeleteRequest with the group
+            disabled={taskCount > 0} // Disable if tasks exist, parent also checks
             className="gap-2 text-destructive focus:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
@@ -113,7 +76,7 @@ export default function GroupContextMenu({
 
       <GroupFormModal
         user={user}
-        guestUser={guestUser}
+        // guestUser={guestUser} // Removed
         settings={settings}
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}

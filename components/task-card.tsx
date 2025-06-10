@@ -61,11 +61,11 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
         })
         .eq("id", subtaskId)
       if (error) throw error
-      onUpdate() // Trigger parent to re-fetch/update tasks
+      // onUpdate() // Trigger parent to re-fetch/update tasks - REMOVED
     } catch (error) {
       console.error("Error completing subtask:", error)
       // Revert optimistic update if needed, but with realtime, the server state will quickly correct it.
-      onUpdate() // Ensure UI is consistent with server on error
+      // onUpdate() // Ensure UI is consistent with server on error - REMOVED
     } finally {
       setCompletingSubtask(null)
     }
@@ -114,7 +114,7 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
                         <motion.h3
                           className={cn(
                             "font-medium text-foreground hover:text-primary transition-colors cursor-pointer relative",
-                            task.completed && "line-through-animated",
+                            task.completed && "line-through-animated activated",
                           )}
                           onClick={() => onEdit && onEdit(task)}
                           animate={{
@@ -130,7 +130,7 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
                         <motion.p
                           className={cn(
                             "text-sm text-muted-foreground mb-3 leading-relaxed",
-                            task.completed && "line-through-animated",
+                            task.completed && "line-through-animated activated",
                           )}
                           animate={{
                             opacity: task.completed ? 0.7 : 1,
@@ -246,7 +246,7 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
                     className="h-4 w-4 rounded-sm"
                   />
                   <motion.span
-                    className={cn("text-sm flex-1 relative", subtask.completed && "line-through-animated")}
+                    className={cn("text-sm flex-1 relative", subtask.completed && "line-through-animated activated")}
                     animate={{
                       opacity: subtask.completed ? 0.7 : 1,
                     }}

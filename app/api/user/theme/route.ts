@@ -25,16 +25,19 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (user) {
-    const { error } = await supabase.auth.updateUser({
-      data: { theme: theme }, // Ensure your Supabase user_metadata allows 'theme'
-    });
+    // const { error } = await supabase.auth.updateUser({ // Old method
+    //   data: { theme: theme },
+    // });
+    const { error } = await supabase
+      .from("user_settings")
+      .upsert({ user_id: user.id, theme: theme }, { onConflict: 'user_id' });
 
     if (error) {
-      console.error('Error updating theme:', error);
+      console.error('Error updating theme in user_settings:', error);
       return NextResponse.json({ error: 'Failed to update theme' }, { status: 500 });
     }
 
-    return NextResponse.json({ message: 'Theme updated successfully' });
+    return NextResponse.json({ message: 'Theme updated successfully in user_settings' });
   }
 
   return NextResponse.json({ error: 'User not found' }, { status: 401 });

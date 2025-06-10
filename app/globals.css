@@ -37,6 +37,15 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Z-Index Scale */
+    --z-index-dropdown: 10;
+    --z-index-sticky: 20;
+    --z-index-popover: 30;
+    --z-index-tooltip: 40;
+    --z-index-dialog: 50; /* For modals, dialogs */
+    --z-index-toast: 60; /* For notifications like Sonner */
+    --z-index-custom-cursor: 9999; /* Keep high if it needs to overlay everything */
   }
 
   .dark {
@@ -138,7 +147,7 @@
     transition: transform 0.3s ease-out;
   }
 
-  .line-through-animated.line-through-animated::after {
+  .line-through-animated.activated::after { /* Changed selector */
     transform: scaleX(1);
   }
 }
@@ -184,7 +193,8 @@
     box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
   }
 
-  /* Neda theme specific styles */
+  /* Neda theme specific styles removed as they are covered by the HSL semantic block above */
+  /*
   .theme-neda {
     --neda-main: #faf7ff;
     --neda-text-main: #5c5470;
@@ -194,6 +204,7 @@
     --neda-card: #ffffff;
     --neda-subtle: #eae4f0;
   }
+  */
 
   .theme-neda .glass {
     background: rgba(255, 255, 255, 0.8);
