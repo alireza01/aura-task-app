@@ -6,22 +6,6 @@
 -- functions, RLS policies, indexes, and triggers.
 -- =================================================================
 
--- 1. Drop existing objects to ensure a clean slate
--- This is useful for development and resetting the schema.
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.create_public_user_profile_and_settings();
-DROP FUNCTION IF EXISTS public.is_admin(uuid);
-DROP FUNCTION IF EXISTS public.update_updated_at_column();
-DROP TABLE IF EXISTS public.task_tags CASCADE;
-DROP TABLE IF EXISTS public.subtasks CASCADE;
-DROP TABLE IF EXISTS public.tasks CASCADE;
-DROP TABLE IF EXISTS public.tags CASCADE;
-DROP TABLE IF EXISTS public.task_groups CASCADE;
-DROP TABLE IF EXISTS public.user_settings CASCADE;
-DROP TABLE IF EXISTS public.admin_api_keys CASCADE;
-DROP TABLE IF EXISTS public.user_profiles CASCADE;
-
-
 -- 2. Create Tables
 -- Define all table structures first.
 CREATE TABLE IF NOT EXISTS public.user_profiles (
@@ -46,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.admin_api_keys (
 
 CREATE TABLE IF NOT EXISTS public.user_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   gemini_api_key TEXT,
   speed_weight INTEGER DEFAULT 50,
   importance_weight INTEGER DEFAULT 50,
@@ -188,7 +172,10 @@ CREATE POLICY "Users can manage their own tasks" ON public.tasks FOR ALL USING (
 CREATE POLICY "Admins can select all tasks" ON public.tasks FOR SELECT USING (public.is_admin(auth.uid()));
 
 -- subtasks policies
-CREATE POLICY "Users can manage subtasks of their tasks" ON public.subtasks FOR ALL USING (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = subtasks.task_id AND tasks.user_id = auth.uid()));
+CREATE POLICY "Users can select subtasks of their tasks" ON public.subtasks FOR SELECT USING (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = subtasks.task_id AND tasks.user_id = auth.uid()));
+CREATE POLICY "Users can insert subtasks to their tasks" ON public.subtasks FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = subtasks.task_id AND tasks.user_id = auth.uid()));
+CREATE POLICY "Users can update subtasks of their tasks" ON public.subtasks FOR UPDATE USING (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = subtasks.task_id AND tasks.user_id = auth.uid())) WITH CHECK (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = subtasks.task_id AND tasks.user_id = auth.uid()));
+CREATE POLICY "Users can delete subtasks of their tasks" ON public.subtasks FOR DELETE USING (EXISTS (SELECT 1 FROM tasks WHERE tasks.id = subtasks.task_id AND tasks.user_id = auth.uid()));
 CREATE POLICY "Admins can select all subtasks" ON public.subtasks FOR SELECT USING (public.is_admin(auth.uid()));
 
 -- tags policies

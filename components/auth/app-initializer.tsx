@@ -2,15 +2,20 @@
 "use client";
 
 import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client'; // Ensure this path is correct
-import { useAppStore } from '@/lib/hooks/use-app-store'; // Ensure this path is correct
-import { useThemeStore } from '@/lib/hooks/use-theme-store'; // Ensure this path is correct
-// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // No longer needed
+import { supabase } from '@/lib/supabase/client';
+import { useAppStore } from '@/lib/hooks/use-app-store';
+import { useThemeStore } from '@/lib/hooks/use-theme-store';
+import { useTheme as useNextTheme } from 'next-themes'; // Import useNextTheme
 
 export default function AppInitializer() {
-  const { setUser, setInitialized } = useAppStore();
-  const { setTheme } = useThemeStore(); // Changed from fetchAndSetTheme to setTheme based on guide's code for onAuthStateChange
-  // const supabaseClient = createClientComponentClient(); // No longer needed, use imported supabase
+  const { setUser, setInitialized, isInitialized } = useAppStore();
+  const zustandSetTheme = useThemeStore(state => state.setTheme);
+  const { setTheme: nextThemesSetTheme } = useNextTheme(); // Get setTheme from next-themes
+
+  const applyTheme = (themeValue: string) => {
+    zustandSetTheme(themeValue, true); // Update Zustand store, mark as fromInitializer
+    nextThemesSetTheme(themeValue); // Update next-themes provider
+  };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -18,66 +23,58 @@ export default function AppInitializer() {
         const user = session?.user ?? null;
         setUser(user);
 
-        // Set the theme from user metadata if it exists, otherwise default.
-        // The guide uses 'system' as a default if not found in metadata.
         const userTheme = user?.user_metadata?.theme ?? 'system';
-        // Directly set the theme in the store.
-        // The store's setTheme will update the state and trigger API call if implemented that way,
-        // but here it's about reflecting the loaded theme, not saving a new choice.
-        // The useThemeStore's setTheme also handles the API call.
-        // For initial load, we might want to avoid re-saving the theme if it's just loaded.
-        // The guide's setTheme in useThemeStore immediately calls the API.
-        // This might need adjustment if we want to avoid saving on initial load.
-        // However, the guide's useThemeStore.setTheme does an async API call without awaiting here.
-        // Let's stick to the guide's direct usage of setTheme.
-        setTheme(userTheme);
+        applyTheme(userTheme);
 
-        setInitialized(true);
+        if (!isInitialized) {
+          setInitialized(true);
+        }
       }
     );
 
-    // Initial check for session, in case onAuthStateChange doesn't fire immediately
-    // or for the very first load.
+    // Initial check for session
     const checkInitialSession = async () => {
-      let user = useAppStore.getState().user;
-      if (!user) {
-        const { data } = await supabase.auth.getUser();
-        user = data.user;
-      }
+      if (isInitialized) return; // Already initialized by onAuthStateChange or previous run
 
-      if (user && !useAppStore.getState().isInitialized) {
+      const { data: { session } } = await supabase.auth.getSession(); // Use getSession for initial check
+      let user = session?.user ?? null;
+      let themeToApply = 'system'; // Default
+
+      if (user) {
         setUser(user);
-        const userTheme = user?.user_metadata?.theme ?? 'system';
-        setTheme(userTheme);
-        setInitialized(true);
-      } else if (!user && !useAppStore.getState().isInitialized) {
+        themeToApply = user.user_metadata?.theme ?? 'system';
+      } else {
+        // No active session, attempt anonymous sign-in
         try {
-          // Attempt anonymous sign-in
           const { data: anonSignInData, error: anonSignInError } = await supabase.auth.signInAnonymously();
           if (anonSignInError) {
             console.error('Error signing in anonymously:', anonSignInError);
-            setUser(null); // Ensure user is null if sign-in fails
-            setTheme('system'); // Default theme
+            setUser(null);
           } else if (anonSignInData?.user) {
-            setUser(anonSignInData.user);
-            const userTheme = anonSignInData.user?.user_metadata?.theme ?? 'system';
-            setTheme(userTheme);
+            user = anonSignInData.user;
+            setUser(user);
+            // Anonymous users might not have a theme in metadata, defaults to 'system'
+            themeToApply = user.user_metadata?.theme ?? 'system';
           }
         } catch (error) {
           console.error('Exception during anonymous sign-in:', error);
           setUser(null);
-          setTheme('system');
         }
-        setInitialized(true);
       }
+
+      applyTheme(themeToApply);
+      setInitialized(true);
     };
 
-    checkInitialSession();
+    // Only run checkInitialSession if not already initialized to prevent race conditions
+    if (!isInitialized) {
+        checkInitialSession();
+    }
 
     return () => {
       subscription?.unsubscribe();
     };
-  }, [setUser, setInitialized, setTheme]); // supabaseClient removed from dependencies as we use the global one
+  }, [setUser, setInitialized, zustandSetTheme, nextThemesSetTheme, isInitialized]);
 
-  return null; // This component does not render anything
+  return null;
 }

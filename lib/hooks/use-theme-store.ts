@@ -1,51 +1,59 @@
 // lib/hooks/use-theme-store.ts
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase/client'; // Ensure this path is correct
+import { useTheme as useNextTheme } from 'next-themes'; // Import useTheme from next-themes
+import { toast } from 'sonner'; // For notifications
 
 type ThemeState = {
-  theme: string;
-  setTheme: (theme: string) => Promise<void>;
-  fetchAndSetTheme: (userId: string | null) => Promise<void>;
+  theme: string; // This will store the current theme (e.g., 'light', 'dark', 'system')
+  setTheme: (theme: string, fromInitializer?: boolean) => void; // Renamed, simpler, synchronous for local state
+  saveTheme: (themeToSave: string) => Promise<void>; // Explicit function to save to backend
+  isSavingTheme: boolean; // To track loading state for save operation
 };
 
-export const useThemeStore = create<ThemeState>((set) => ({
-  theme: 'system', // Default theme
-  setTheme: async (newTheme: string) => {
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  theme: 'system', // Default theme, will be updated by AppInitializer
+  isSavingTheme: false,
+
+  setTheme: (newTheme: string, fromInitializer: boolean = false) => {
+    // `fromInitializer` flag to prevent potential issues if next-themes also tries to set initial theme
+    // This function updates local Zustand state and calls next-themes setter.
+    // It does NOT save to the backend.
+
+    // We need to access next-themes' setTheme function.
+    // This is tricky because hooks can't be called directly inside Zustand create.
+    // We'll call this from components where useNextTheme() is available, or AppInitializer.
+    // For now, this function primarily updates the Zustand state.
+    // The actual call to next-themes' setTheme will be done in AppInitializer and ThemeSelector.
     set({ theme: newTheme });
+
+    // If we want to ensure next-themes is also updated when this is called,
+    // we might need a ref to the next-themes' setTheme function, or pass it in.
+    // For now, let's assume components will call both.
+    // This will be simplified in AppInitializer and ThemeSelector.
+  },
+
+  saveTheme: async (themeToSave: string) => {
+    set({ isSavingTheme: true });
     try {
-      await fetch('/api/user/theme', {
+      const response = await fetch('/api/user/theme', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ theme: newTheme }),
+        body: JSON.stringify({ theme: themeToSave }),
       });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save theme');
+      }
+      toast.success('Theme saved successfully!');
+      // Optionally update local state again if response provides canonical value, though usually not needed.
+      // set({ theme: themeToSave }); // Already set by setTheme
     } catch (error) {
       console.error('Error saving theme:', error);
-    }
-  },
-  fetchAndSetTheme: async (userId: string | null) => {
-    if (!userId) {
-      // For guest users or when no user is logged in,
-      // default to 'system' or a theme from local storage if implemented.
-      // The guide defaults to 'system'.
-      set({ theme: 'system' });
-      return;
-    }
-    try {
-      // This part is tricky as client-side cannot directly query user_metadata.
-      // The guide suggests that the theme is set on initial load (via AppInitializer)
-      // and updated via the store.
-      // So, this function might primarily be for explicit fetching if ever needed,
-      // but AppInitializer will handle the initial theme setting from user metadata.
-      // For now, if a userId is provided, we assume AppInitializer has done its job
-      // or will do it. If not, we could fetch session data again, but that might be redundant.
-      // The initial theme is loaded in AppInitializer.
-      // console.log('fetchAndSetTheme called for user:', userId, 'but theme is primarily set via AppInitializer');
-      // No direct fetch here, rely on AppInitializer or initial state.
-    } catch (error) {
-      console.error('Error fetching theme:', error);
-      set({ theme: 'system' }); // Fallback theme
+      toast.error(error instanceof Error ? error.message : 'Could not save theme.');
+    } finally {
+      set({ isSavingTheme: false });
     }
   },
 }));
