@@ -45,12 +45,7 @@ export default function GroupFormModal({
   const [aiLoading, setAiLoading] = useState(false)
   const [localGroups, setLocalGroups] = useLocalStorage<TaskGroup[]>("aura-groups", [])
   const showToast = toast
-  const [supabase, setSupabase] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
-
+  const supabase = createClient()
   const isEditMode = !!groupToEdit
   const modalTitle = isEditMode ? `ویرایش گروه: ${groupToEdit.name}` : "ایجاد گروه جدید"
 

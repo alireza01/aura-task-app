@@ -28,11 +28,7 @@ export default function ApiKeyManager({ user, settings, onSettingsChange }: ApiK
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const { toast } = useToast()
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
 
   useEffect(() => {
     if (settings?.gemini_api_key) {

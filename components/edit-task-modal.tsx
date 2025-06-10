@@ -33,11 +33,7 @@ export default function EditTaskModal({
   const [loading, setLoading] = useState(false)
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const showToast = toast
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
 
   const handleSaveTask = async (formData: any) => {
     setLoading(true)

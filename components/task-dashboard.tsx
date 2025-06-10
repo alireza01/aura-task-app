@@ -55,11 +55,7 @@ export default function TaskDashboard({ user }: TaskDashboardProps) {
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
 
   // Filters
   const [filterGroup, setFilterGroup] = useState<string | null>(null)

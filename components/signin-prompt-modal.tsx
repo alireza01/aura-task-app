@@ -15,11 +15,7 @@ interface SignInPromptModalProps {
 
 export default function SignInPromptModal({ onClose, onSignIn }: SignInPromptModalProps) {
   const [loading, setLoading] = useState(false)
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
 
   const handleSignIn = async () => {
     if (!supabaseClient) return

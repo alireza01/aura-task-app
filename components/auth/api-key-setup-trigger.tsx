@@ -13,20 +13,13 @@ interface ApiKeySetupTriggerProps {
 export default function ApiKeySetupTrigger({ user, onApiKeySet }: ApiKeySetupTriggerProps) {
   const [showModal, setShowModal] = useState(false)
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
+  const supabaseClient = createClient()
 
   useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
-
-  useEffect(() => {
-    if (supabaseClient) {
-      checkApiKeyStatus()
-    }
+    checkApiKeyStatus()
   }, [user, supabaseClient])
 
   const checkApiKeyStatus = async () => {
-    if (!supabaseClient) return
     try {
       // Check if user has API key in settings
       const { data: settings } = await supabaseClient

@@ -29,11 +29,7 @@ export default function ArchiveView({
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const [loading, setLoading] = useState<string | null>(null)
   const { toast } = useToast()
-  const [supabase, setSupabase] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
+  const supabase = createClient()
 
   const handleUnarchive = async (taskId: string) => {
     setLoading(taskId)
