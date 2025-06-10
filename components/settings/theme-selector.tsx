@@ -24,6 +24,7 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
   // Initialize selectedTheme with the theme from context, update if settings prop changes.
   const [selectedTheme, setSelectedTheme] = useState<string>(theme)
   const { toast } = useToast() // Retain toast for other potential uses or remove if not used elsewhere
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
     // Reflect theme from useTheme context
@@ -37,6 +38,21 @@ export default function ThemeSelector({ user, settings, onSettingsChange }: Them
       setSelectedTheme(settings.theme || "default")
     }
   }, [settings])
+
+  useEffect(() => {
+    if (user && !('isGuest' in user) && settings?.theme !== theme && theme) {
+      const saveTheme = async () => {
+        await supabase
+          .from("user_settings")
+          .upsert({
+            user_id: user.id,
+            theme: theme,
+            updated_at: new Date().toISOString(),
+          })
+      };
+      saveTheme();
+    }
+  }, [theme, user, settings, supabase]);
 
   const handleThemeChange = (newThemeValue: string) => {
     const newTheme = newThemeValue as "default" | "alireza" | "neda" // Cast to Theme type

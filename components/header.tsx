@@ -6,6 +6,8 @@ import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@/types"
+import { useRouter } from "next/navigation"
+import { signOut } from "@/lib/auth/actions"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -30,11 +32,8 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const { theme, setTheme } = useTheme()
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
+  const router = useRouter()
 
   const handleSignIn = async () => {
     if (!supabaseClient) return
@@ -54,8 +53,7 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
   }
 
   const handleSignOut = async () => {
-    if (!supabaseClient) return
-    await supabaseClient.auth.signOut()
+    await signOut(router)
   }
 
   const debouncedSearchQuery = useDebounce(searchQuery, 500)

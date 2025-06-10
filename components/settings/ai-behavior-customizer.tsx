@@ -31,11 +31,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
   const debouncedAutoRanking = useDebounce(autoRanking, 500)
   const debouncedAutoSubtasks = useDebounce(autoSubtasks, 500)
   const { toast } = useToast()
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
 
   useEffect(() => {
     if (settings) {

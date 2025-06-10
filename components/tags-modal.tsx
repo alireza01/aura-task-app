@@ -40,11 +40,7 @@ export default function TagsModal({ user, guestUser, tags, onClose, onTagsChange
   const [loading, setLoading] = useState(false)
   const [localTags, setLocalTags] = useLocalStorage<Tag[]>("aura-tags", [])
   const showToast = toast
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
 
   const handleAddTag = async (e: React.FormEvent) => {
     e.preventDefault()

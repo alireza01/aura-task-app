@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
+import { useRouter } from "next/navigation"
+import { signOut } from "@/lib/auth/actions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -29,24 +31,19 @@ export default function AccountActions({ user }: AccountActionsProps) {
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
-
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
+  const supabaseClient = createClient()
+  const router = useRouter()
 
   const handleSignOut = async () => {
-    if (!supabaseClient) return
     setLoading(true)
-
     try {
-      await supabaseClient.auth.signOut()
+      await signOut(router)
       toast({
         title: "خروج موفقیت‌آمیز",
         description: "شما با موفقیت از حساب کاربری خود خارج شدید.",
       })
     } catch (error) {
-      console.error("خطا در خروج از حساب کاربری:", error)
+      console.error("Error signing out:", error)
       toast({
         title: "خطا در خروج از حساب کاربری",
         description: "مشکلی در خروج از حساب کاربری رخ داد. لطفاً دوباره تلاش کنید.",
@@ -59,6 +56,9 @@ export default function AccountActions({ user }: AccountActionsProps) {
   }
 
   const handleDeleteAccount = async () => {
+    // No direct call to supabaseClient.auth.signOut() here, so no change for signOut action.
+    // However, if a sign out is desired after account deletion, it should be added.
+    // For now, this function remains as is regarding the new signOut action.
     if (!supabaseClient) return
     setLoading(true)
 
@@ -79,7 +79,18 @@ export default function AccountActions({ user }: AccountActionsProps) {
       // if (authError) throw authError
 
       // Sign out
+      // await supabaseClient.auth.signOut() // Original line
+      // If redirection is needed after account deletion, call signOut(router) here.
+      // For now, assume the existing behavior (toast then dialog close) is sufficient.
+      // If a full sign-out and redirect is needed, this would be:
+      // await signOut(router);
+      // However, this might conflict with the toast message below if signOut also shows one.
+      // For now, let's keep the existing supabaseClient.auth.signOut() for this specific case
+      // as it's part of a larger "delete account" flow, not just a simple sign-out.
+      // The subtask is about refactoring the main sign-out actions.
+      // If this needs to change, a new subtask should address it.
       await supabaseClient.auth.signOut()
+
 
       toast({
         title: "حساب کاربری (اطلاعات محلی) حذف شد",
