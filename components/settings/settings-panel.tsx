@@ -14,17 +14,18 @@ import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
 import ThemeSelector from "@/components/settings/theme-selector"
 import { AccountActions } from "@/components/settings/account-actions"
 import AdminSettingsSection from "@/components/settings/admin" // Added import
-import type { UserSettings, GuestUser } from "@/types"
+import type { UserSettings, GuestUser, UserProfile } from "@/types"
 
 interface SettingsPanelProps {
-  user: User | GuestUser | null
+  user: User | null
+  profile: UserProfile | null
   settings: UserSettings | null
   isOpen: boolean
   onClose: () => void
   onSettingsChange: () => void
 }
 
-export default function SettingsPanel({ user, settings, isOpen, onClose, onSettingsChange }: SettingsPanelProps) {
+export default function SettingsPanel({ user, profile, settings, isOpen, onClose, onSettingsChange }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState("ai")
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
@@ -139,8 +140,8 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
                 </TabsContent>
 
                 <TabsContent value="account" className="space-y-6 py-4">
-                  {user && !("isGuest" in user) && (
-                    <AccountActions user={user as User} />
+                  {user && profile && (
+                    <AccountActions user={user} profile={profile} />
                   )}
                 </TabsContent>
               </Tabs>

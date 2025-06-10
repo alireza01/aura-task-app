@@ -440,7 +440,7 @@ export default function TaskDashboard({ user: initialUser }: TaskDashboardProps)
         {showEditTask && taskToEdit && (<EditTaskModal user={user} task={taskToEdit} groups={groups} tags={tags} settings={settings} onClose={() => { setShowEditTask(false); setTaskToEdit(null); }} onTaskUpdated={handleTaskAddedOrUpdated} />)}
         {showSignInPrompt && (<SignInPromptModal onClose={() => setShowSignInPrompt(false)} onSignIn={() => { setShowSignInPrompt(false);}} />)}
         {user && showApiKeySetup && (<ApiKeySetup onComplete={() => {setShowApiKeySetup(false); if(user?.id) loadSettings(user.id, user, userProfile);}} onSkip={() => setShowApiKeySetup(false)} />)}
-        {showSettings && (<SettingsPanel user={user} settings={settings} isOpen={showSettings} onClose={() => setShowSettings(false)} onSettingsChange={handleSettingsChange} />)}
+        {showSettings && (<SettingsPanel user={user} profile={userProfile} settings={settings} isOpen={showSettings} onClose={() => setShowSettings(false)} onSettingsChange={handleSettingsChange} />)}
         {showTags && (<TagsModal user={user} tags={tags} onClose={() => setShowTags(false)} onTagsChange={handleTagsChange} />)}
         {showNicknameModal && userProfile && user && !userProfile.is_guest && (
           <NicknameSetupModal

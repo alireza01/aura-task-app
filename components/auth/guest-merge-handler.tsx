@@ -1,14 +1,35 @@
-// In components/auth/guest-merge-handler.tsx
-
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useUser } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { mergeGuestAccount } from '@/lib/auth/actions'
+import type { User } from '@supabase/supabase-js'
 
 export function GuestMergeHandler() {
-  const { user } = useUser() // Replace with your actual user state management
+  const [user, setUser] = useState<User | null>(null);
   const [isMergeAttempted, setIsMergeAttempted] = useState(false)
+  const supabase = createClient()
+
+  useEffect(() => {
+    // Fetch the initial user
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      // Reset merge attempt status if user changes (e.g., signs out)
+      if (_event === "SIGNED_OUT") {
+        setIsMergeAttempted(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
+
 
   useEffect(() => {
     if (isMergeAttempted || !user) return
