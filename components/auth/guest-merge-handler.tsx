@@ -1,0 +1,41 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useUser } from '@/hooks/useUser' // Assuming you have a hook to get user data
+import { mergeGuestAccount } from '@/lib/auth/actions'
+
+export function GuestMergeHandler() {
+  const { user } = useUser() // Replace with your actual user state management
+  const [isMergeAttempted, setIsMergeAttempted] = useState(false)
+
+  useEffect(() => {
+    if (isMergeAttempted || !user) return
+
+    const guestIdToMerge = localStorage.getItem('GUEST_ID_TO_MERGE')
+
+    // Check if there's a logged-in (non-guest) user AND a guest ID to merge
+    if (guestIdToMerge && user && !user.is_anonymous) { // Added null check for user
+      setIsMergeAttempted(true)
+      console.log(`Client: Found guest ID ${guestIdToMerge} to merge into ${user.id}.`)
+
+      mergeGuestAccount(guestIdToMerge).then((result) => {
+        if (result.success) {
+          console.log('Client: Merge successful. Cleaning up.')
+          localStorage.removeItem('GUEST_ID_TO_MERGE')
+          // Refresh the page to ensure all data is correctly displayed
+          window.location.reload()
+        } else {
+          console.error('Client: Merge failed.', result.error)
+          // Optionally, show a toast notification to the user about the failure
+          localStorage.removeItem('GUEST_ID_TO_MERGE')
+        }
+      })
+    } else if (guestIdToMerge && user && user.is_anonymous && guestIdToMerge === user.id) { // Added null check for user
+        // Cleanup in case the user reloads the page before the redirect happens
+        // and is still the same guest.
+        localStorage.removeItem('GUEST_ID_TO_MERGE');
+    }
+  }, [user, isMergeAttempted])
+
+  return null // This component renders nothing.
+}
