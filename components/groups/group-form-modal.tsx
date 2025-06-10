@@ -108,7 +108,7 @@ export default function GroupFormModal({
         },
         body: JSON.stringify({
           groupName,
-          apiKey: settings.gemini_api_key,
+          // apiKey: settings.gemini_api_key, // API key is removed from here
         }),
       })
 

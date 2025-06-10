@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { TaskCard } from "@/components/task-card"
-import type { Task, TaskGroup as TaskGroupType, UserSettings, User } from "@/types"
+// TaskCard is not directly used here anymore, DraggableTaskCard wraps it.
+// import { TaskCard } from "@/components/task-card"
+import type { Task, TaskGroup as TaskGroupType, UserSettings, User, Subtask, Tag } from "@/types" // Added Subtask, Tag
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Archive, RotateCcw, ChevronDown, ChevronUp } from "lucide-react"
@@ -17,9 +18,12 @@ interface TaskListProps {
   user: User | null
   onTasksChange: () => void
   onGroupsChange: () => void
-  onComplete: (taskId: string, completed: boolean) => Promise<void> // Added for optimistic updates
+  onComplete: (taskId: string, completed: boolean) => Promise<void>
   onEditTask?: (task: Task) => void
   onDeleteTask?: (taskId: string) => void
+  detailedTasks: Record<string, { subtasks: Subtask[], tags: Tag[] } | undefined>;
+  loadTaskDetails: (taskId: string) => void;
+  loadingTaskDetails: Record<string, boolean>;
 }
 
 export default function TaskList({
@@ -29,9 +33,12 @@ export default function TaskList({
   user,
   onTasksChange,
   onGroupsChange,
-  onComplete, // Destructure onComplete prop
+  onComplete,
   onEditTask,
   onDeleteTask,
+  detailedTasks,
+  loadTaskDetails,
+  loadingTaskDetails,
 }: TaskListProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(groups.map((g) => g.id)))
   const [showArchive, setShowArchive] = useState(false)
@@ -115,10 +122,13 @@ export default function TaskList({
                     >
                       <DraggableTaskCard
                         task={task}
-                        onComplete={onComplete} // Use onComplete prop
+                        onComplete={onComplete}
                         onUpdate={onTasksChange}
                         onEdit={onEditTask}
                         onDelete={onDeleteTask}
+                        details={detailedTasks[task.id]}
+                        loadDetails={() => loadTaskDetails(task.id)}
+                        isLoadingDetails={loadingTaskDetails[task.id] || false}
                       />
                     </motion.div>
                   ))}
@@ -163,12 +173,15 @@ export default function TaskList({
                       transition={{ duration: 0.3 }}
                     >
                       <DraggableTaskCard
-                        key={task.id}
+                        key={task.id} // key prop should be on DraggableTaskCard itself for SortableContext
                         task={task}
-                        onComplete={onComplete} // Use onComplete prop
+                        onComplete={onComplete}
                         onUpdate={onTasksChange}
                         onEdit={onEditTask}
                         onDelete={onDeleteTask}
+                        details={detailedTasks[task.id]}
+                        loadDetails={() => loadTaskDetails(task.id)}
+                        isLoadingDetails={loadingTaskDetails[task.id] || false}
                       />
                     </motion.div>
                   ))}
@@ -258,12 +271,22 @@ export default function TaskList({
                         </Button>
                       </div>
                       <div className="opacity-60">
-                        <TaskCard
+                        {/* We use DraggableTaskCard here as well if archived tasks were ever to be draggable,
+                            or TaskCard directly if not. For consistency in prop passing,
+                            let's assume DraggableTaskCard is okay, or use TaskCard with same props.
+                            For simplicity, using TaskCard directly as archived items are not sortable.
+                            However, to keep the prop structure consistent with what DraggableTaskCard expects
+                            for details, loadDetails, isLoadingDetails, we pass them.
+                        */}
+                        <TaskCard // Changed from DraggableTaskCard to TaskCard for non-draggable archived items
                           task={task}
-                          onComplete={onComplete} // Use onComplete prop
-                          onUpdate={onTasksChange}
+                          onComplete={onComplete}
+                          onUpdate={onTasksChange} // onUpdate might be onTasksChange or a specific handler
                           onEdit={onEditTask}
                           onDelete={onDeleteTask}
+                          details={detailedTasks[task.id]}
+                          loadDetails={() => loadTaskDetails(task.id)}
+                          isLoadingDetails={loadingTaskDetails[task.id] || false}
                         />
                       </div>
                     </motion.div>

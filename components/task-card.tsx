@@ -20,14 +20,26 @@ import { motion, AnimatePresence } from "framer-motion" // Added AnimatePresence
 
 interface TaskCardProps {
   task: Task
-  onComplete: (taskId: string, completed: boolean) => Promise<void> // Modified to pass taskId and completed status
-  onUpdate: () => void
+  onComplete: (taskId: string, completed: boolean) => Promise<void>
+  onUpdate: () => void // Kept for now, but might be less relevant with on-demand loading for details
   onEdit?: (task: Task) => void
   onDelete?: (taskId: string) => void
+  details?: { subtasks: Subtask[], tags: Tag[] } | null
+  loadDetails?: () => void
+  isLoadingDetails?: boolean
 }
 
-export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskCardProps) {
-  const [showSubtasks, setShowSubtasks] = useState(false)
+export function TaskCard({
+  task,
+  onComplete,
+  onUpdate,
+  onEdit,
+  onDelete,
+  details,
+  loadDetails,
+  isLoadingDetails,
+}: TaskCardProps) {
+  const [showDetailsSection, setShowDetailsSection] = useState(false) // Used to control visibility of details
   const [completingSubtask, setCompletingSubtask] = useState<string | null>(null)
   const [supabaseClient, setSupabaseClient] = useState<any>(null)
 
@@ -39,18 +51,25 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
     await onComplete(task.id, checked)
   }
 
+  const handleExpandDetails = () => {
+    if (loadDetails) {
+      loadDetails();
+    }
+    setShowDetailsSection(true);
+  };
+
   const completeSubtask = async (subtaskId: string) => {
     if (!supabaseClient) return
     setCompletingSubtask(subtaskId)
-    const originalSubtasks = task.subtasks || []
+    // Subtasks for optimistic update should come from `details` if available
+    const currentSubtasks = details?.subtasks || task.subtasks || [];
 
     // Optimistic update
-    const updatedSubtasks = originalSubtasks.map((st) =>
+    const updatedSubtasks = currentSubtasks.map((st) =>
       st.id === subtaskId ? { ...st, completed: true, completed_at: new Date().toISOString() } : st,
-    )
-    // This requires the parent to update the task prop, which TaskDashboard's realtime will do.
-    // For immediate visual feedback, we might need a local state for subtasks if onUpdate is slow.
-    // However, since TaskDashboard now has realtime, onUpdate should trigger a quick re-render.
+    );
+    // The parent (TaskDashboard) should update the `details` prop via its state management
+    // when a subtask completion is confirmed by Supabase, triggering a re-render.
 
     try {
       const { error } = await supabaseClient
@@ -61,20 +80,19 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
         })
         .eq("id", subtaskId)
       if (error) throw error
-      // onUpdate() // Trigger parent to re-fetch/update tasks - REMOVED
+      // onUpdate is not strictly needed here if parent re-fetches details or realtime updates details
     } catch (error) {
       console.error("Error completing subtask:", error)
-      // Revert optimistic update if needed, but with realtime, the server state will quickly correct it.
-      // onUpdate() // Ensure UI is consistent with server on error - REMOVED
+      // Realtime should correct any optimistic update discrepancies.
     } finally {
       setCompletingSubtask(null)
     }
   }
 
-  const subtasks = task.subtasks || []
-  const completedSubtasks = subtasks.filter((st) => st.completed).length
-  const tags = task.tags || []
-  const dragInstructionsId = `drag-handle-instructions-${task.id}`; // Unique ID for instructions
+  const displaySubtasks = details?.subtasks || task.subtasks || []
+  const completedSubtasksCount = displaySubtasks.filter((st) => st.completed).length
+  const displayTags = details?.tags || task.tags || []
+  const dragInstructionsId = `drag-handle-instructions-${task.id}`;
 
   return (
     <motion.div
@@ -174,29 +192,86 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
                         </div>
                       )}
 
-                      {/* Subtasks Summary */}
-                      {subtasks.length > 0 && (
-                        <div className="flex items-center justify-between">
+                      {/* Tags - now uses displayTags */}
+                      {displayTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {displayTags.map((tag) => (
+                            <Badge
+                              key={tag.id}
+                              variant="outline"
+                              className={cn("tag rounded-full px-2 py-0 text-xs font-normal", `tag-${tag.color}`)}
+                            >
+                              {tag.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* AI Scores */}
+                      {(task.speed_score || task.importance_score) && (
+                        <div className="flex items-center gap-2 mb-3">
+                          {task.speed_score && (
+                            <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[0.7rem]">
+                              <Clock className="h-3 w-3" />
+                              <span>{task.speed_score}/20</span>
+                            </Badge>
+                          )}
+                          {task.importance_score && (
+                            <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[0.7rem]">
+                              <Star className="h-3 w-3" />
+                              <span>{task.importance_score}/20</span>
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Subtasks/Tags Expansion UI */}
+                      {(!details && (task.subtask_count > 0 || task.tag_count > 0)) && loadDetails && (
+                        <div className="my-3">
+                          <Button onClick={handleExpandDetails} variant="outline" size="sm" className="gap-1.5">
+                            {isLoadingDetails ? (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                style={{ display: "inline-block" }}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </motion.div>
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            <span>
+                              {isLoadingDetails ? "بارگیری..." : `مشاهده جزئیات (${task.subtask_count || 0} زیروظیفه, ${task.tag_count || 0} برچسب)`}
+                            </span>
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Subtasks Summary - shown if details are loaded OR if there are legacy subtasks and no expand button */}
+                      {(details || (displaySubtasks.length > 0 && !loadDetails)) && displaySubtasks.length > 0 && (
+                        <div className="flex items-center justify-between mt-3">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
-                              {completedSubtasks}/{subtasks.length}
+                              {completedSubtasksCount}/{displaySubtasks.length} زیروظیفه تکمیل شده
                             </span>
                             <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-primary transition-all duration-300"
-                                style={{ width: `${(completedSubtasks / subtasks.length) * 100}%` }}
+                                style={{ width: `${displaySubtasks.length > 0 ? (completedSubtasksCount / displaySubtasks.length) * 100 : 0}%` }}
                               />
                             </div>
                           </div>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowSubtasks(!showSubtasks)}
-                            className="h-7 w-7 p-0 rounded-full"
-                          >
-                            {showSubtasks ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
+                          {/* Toggle button for showing/hiding the subtask list if details are loaded */}
+                          {details && (
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => setShowDetailsSection(!showDetailsSection)}
+                               className="h-7 w-7 p-0 rounded-full"
+                             >
+                               {showDetailsSection ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                             </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -228,8 +303,8 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
             </div>
           </div>
 
-          {/* Subtasks */}
-          {showSubtasks && subtasks.length > 0 && (
+          {/* Subtasks Section - Render if showDetailsSection is true AND (details are loaded OR legacy subtasks exist) */}
+          {showDetailsSection && (details || displaySubtasks.length > 0) && displaySubtasks.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -237,7 +312,8 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
               transition={{ duration: 0.2 }}
               className="mt-3 space-y-2 border-t border-border pt-3"
             >
-              {subtasks.map((subtask) => (
+              <h4 className="text-xs font-semibold text-muted-foreground mb-1">زیروظیفه‌ها:</h4>
+              {displaySubtasks.map((subtask) => (
                 <div key={subtask.id} className="flex items-center gap-3">
                   <Checkbox
                     checked={subtask.completed}
@@ -258,6 +334,10 @@ export function TaskCard({ task, onComplete, onUpdate, onEdit, onDelete }: TaskC
               ))}
             </motion.div>
           )}
+          {/* Display tags here as well if details are loaded and section is shown, and not already shown above */}
+          {/* This example primarily focuses on subtasks in the collapsible section. Tags are shown above. */}
+          {/* If tags were also meant to be part of this collapsible section, similar logic for displayTags would be here. */}
+
         </div>
       </Card>
     </motion.div>
