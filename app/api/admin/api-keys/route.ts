@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types'; // Assuming this path is correct
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to check if user is admin
-async function isAdmin(supabase: ReturnType<typeof createRouteHandlerClient<Database>>) {
+async function isAdmin(supabase: SupabaseClient<Database>) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     console.error('Auth error or no user:', userError);
@@ -26,7 +27,7 @@ async function isAdmin(supabase: ReturnType<typeof createRouteHandlerClient<Data
 }
 
 export async function GET(request: Request) {
-  const supabase = createRouteHandlerClient<Database>({ cookies });
+  const supabase = createClient(cookies());
 
   if (!(await isAdmin(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient<Database>({ cookies });
+  const supabase = createClient(cookies());
 
   if (!(await isAdmin(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });

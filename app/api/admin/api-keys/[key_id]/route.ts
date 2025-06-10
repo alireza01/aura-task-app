@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types'; // Assuming this path is correct
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to check if user is admin (can be refactored into a shared util if not already)
-async function isAdmin(supabase: ReturnType<typeof createRouteHandlerClient<Database>>) {
+async function isAdmin(supabase: SupabaseClient<Database>) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     console.error('Auth error or no user:', userError);
@@ -28,7 +29,7 @@ export async function PUT(
   request: Request,
   { params }: { params: { key_id: string } }
 ) {
-  const supabase = createRouteHandlerClient<Database>({ cookies });
+  const supabase = createClient(cookies());
   const { key_id } = params;
 
   if (!key_id || typeof key_id !== 'string' || !key_id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
@@ -106,7 +107,7 @@ export async function DELETE(
   request: Request, // request object is not used here but good to keep for consistency
   { params }: { params: { key_id: string } }
 ) {
-  const supabase = createRouteHandlerClient<Database>({ cookies });
+  const supabase = createClient(cookies());
   const { key_id } = params;
 
   if (!key_id || typeof key_id !== 'string' || !key_id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
