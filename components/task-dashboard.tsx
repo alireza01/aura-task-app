@@ -948,5 +948,4 @@ const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: str
       )}
     </div>
   )
-
 }
