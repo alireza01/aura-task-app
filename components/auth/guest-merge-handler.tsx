@@ -9,9 +9,14 @@ import { mergeGuestAccount } from '@/lib/auth/actions'
 export function GuestMergeHandler() {
   const { user } = useUser() // Replace with your actual user state management
   const [isMergeAttempted, setIsMergeAttempted] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    if (isMergeAttempted || !user) return
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isMounted || isMergeAttempted || !user) return
 
     const guestIdToMerge = localStorage.getItem('GUEST_ID_TO_MERGE')
 
@@ -37,7 +42,7 @@ export function GuestMergeHandler() {
         // and is still the same guest.
         localStorage.removeItem('GUEST_ID_TO_MERGE');
     }
-  }, [user, isMergeAttempted])
+  }, [user, isMergeAttempted, isMounted])
 
   return null // This component renders nothing.
 }
