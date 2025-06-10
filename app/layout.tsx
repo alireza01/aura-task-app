@@ -1,31 +1,24 @@
 // app/layout.tsx
-import type React from "react"
-import type { Metadata } from "next"
-import { GuestSessionManager } from '@/components/auth/guest-session-manager'
-import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'
-import { ThemeProvider } from "@/components/theme/theme-provider"
-import { Toaster } from "sonner"
-// import { SupabaseProvider } from "@/components/auth/supabase-provider" // <-- IMPORT
-import "./globals.css"
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme/theme-provider"; // This is our updated provider
+import { Toaster } from "sonner"; // From existing
+import { TooltipProvider } from "@/components/ui/tooltip"; // Guide adds this
+import AppInitializer from "@/components/auth/app-initializer";
+import GuestSessionManager from "@/components/auth/guest-session-manager";
+import { GuestMergeHandler } from '@/components/auth/guest-merge-handler'; // From existing
 
-export const metadata: Metadata = {
-  title: "آواتسک - مدیریت هوشمند وظایف",
-  description: "مدیریت وظایف با قدرت هوش مصنوعی",
-  manifest: "/manifest.json",
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
-    generator: 'v0.dev'
-}
+export const metadata = {
+  title: "Aura", // Guide's title (temporary)
+  description: "Aura is a simple and beautiful task management app.", // Guide's description (temporary)
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" suppressHydrationWarning>
+    <html lang="fa" dir="rtl" suppressHydrationWarning> {/* Existing lang/dir and suppressHydrationWarning */}
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -34,21 +27,22 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
-        {/* GuestSessionManager and GuestMergeHandler might also benefit from being inside SupabaseProvider
-            if they internally rely on useUser or other context-dependent hooks,
-            though useUser is the one causing the immediate error.
-            Let's place them inside for consistency.
-        */}
-        {/* <SupabaseProvider> */} {/* <-- WRAPPER START */}
+      <body className="min-h-screen bg-background font-sans antialiased"> {/* Existing body classes */}
+        <AppInitializer />
         <GuestSessionManager />
-        <GuestMergeHandler />
-        <ThemeProvider defaultTheme="default">
-          {children}
-          <Toaster richColors position="top-right" />
-        </ThemeProvider>
-        {/* </SupabaseProvider> */} {/* <-- WRAPPER END */}
+        <GuestMergeHandler /> {/* Added from existing */}
+        <TooltipProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster richColors position="top-right" /> {/* Toaster from existing */}
+          </ThemeProvider>
+        </TooltipProvider>
       </body>
     </html>
-  )
+  );
 }
