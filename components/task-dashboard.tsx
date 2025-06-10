@@ -26,6 +26,7 @@ import { SortableContext, verticalListSortingStrategy, arrayMove, useSortable } 
 import { CSS } from '@dnd-kit/utilities'
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
 import TaskGroupsBubbles from '@/components/task-groups-bubbles'
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface TaskDashboardProps {
   user: User | null
@@ -654,15 +655,71 @@ const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: str
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="loading-dots flex justify-center space-x-2 mb-4">
-            <div className="w-3 h-3 bg-primary rounded-full"></div>
-            <div className="w-3 h-3 bg-primary rounded-full"></div>
-            <div className="w-3 h-3 bg-primary rounded-full"></div>
+      <div className="min-h-screen bg-background">
+        <Header
+          user={user} // Pass user to header even in loading state for consistency
+          onSettingsChange={() => setShowSettings(true)}
+          onSearch={setSearchQuery}
+        />
+        <main className="container pt-16 pb-8">
+          {/* Greeting Skeleton */}
+          <div className="mb-8">
+            <Skeleton className="h-9 w-48 mb-3" />
+            <Skeleton className="h-5 w-32" />
           </div>
-          <p className="text-muted-foreground">در حال بارگذاری...</p>
-        </div>
+
+          {/* Add Task Button Skeleton */}
+          <Skeleton className="h-10 w-full md:w-40 mb-4" />
+
+          {/* TaskGroupsBubbles Skeleton */}
+          <div className="mb-8 flex space-x-2 rtl:space-x-reverse overflow-x-auto pb-2">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-10 w-24 rounded-full" />
+            ))}
+            <Skeleton className="h-10 w-10 rounded-full" /> {/* Add group button */}
+          </div>
+
+          {/* Tabs and Filters Skeleton */}
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex space-x-1 rtl:space-x-reverse">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-20 rounded-md" />
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-9 w-24 rounded-md" />
+                <Skeleton className="h-9 w-24 rounded-md" />
+              </div>
+            </div>
+          </div>
+
+          {/* TaskList and StatsDashboard Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="p-4 border rounded-lg bg-muted/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-6 w-6 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-1/2 mb-3" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-8 w-20 rounded-md" />
+                    <div className="flex space-x-2 rtl:space-x-reverse">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden lg:block space-y-4">
+              <Skeleton className="h-64 w-full rounded-lg" />
+              <Skeleton className="h-32 w-full rounded-lg" />
+            </div>
+          </div>
+        </main>
       </div>
     )
   }
@@ -676,7 +733,7 @@ const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: str
       />
 
       {/* Main Content */}
-      <main className="container py-8">
+      <main className="container pt-16 pb-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
             {guestUser && !user
@@ -694,22 +751,53 @@ const handleTaskDropToGroup = useCallback(async (taskId: string, newGroupId: str
           افزودن وظیفه جدید
         </Button>
 
-        <TaskGroupsBubbles
-          user={user}
-          guestUser={guestUser}
-          groups={groups}
-          selectedGroup={filterGroup}
-          onGroupSelect={setFilterGroup}
-          onGroupsChange={user ? loadGroups : () => setGroups([...localGroups])}
-          onTaskDrop={handleTaskDropToGroup}
-          getTaskCountForGroup={(groupId) => tasks.filter((t) => t.group_id === groupId && !t.completed).length}
-        />
+        {/* Conditional rendering for no groups */}
+        {!loading && groups.length === 0 ? (
+          <div className="text-center py-12 my-8 bg-muted/20 rounded-lg">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-primary">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.688 4.156a2.25 2.25 0 0 1-2.25-2.25V15M11 19.5h1.258c1.28 0 2.501-.422 3.502-1.186A2.25 2.25 0 0 0 18 16.5v-3a2.25 2.25 0 0 0-2.25-2.25h-1.5a2.25 2.25 0 0 0-2.25 2.25v3.75m0 0A2.25 2.25 0 0 1 9.75 18h-3a2.25 2.25 0 0 1-2.25-2.25V15m0 0A2.25 2.25 0 0 0 6.75 12.75h3" />
+                </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-foreground mb-3">به نظر می‌رسد هنوز گروهی ایجاد نکرده‌اید!</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              گروه‌ها به شما کمک می‌کنند تا وظایف خود را بهتر سازماندهی کنید. با کلیک بر روی دکمه افزودن گروه در نوار گروه‌ها شروع کنید.
+            </p>
+            <TaskGroupsBubbles
+              user={user}
+              guestUser={guestUser}
+              groups={groups} // Will be empty, but shows the "Add Group" button
+              selectedGroup={filterGroup}
+              onGroupSelect={setFilterGroup}
+              onGroupsChange={user ? loadGroups : () => setGroups([...localGroups])}
+              onTaskDrop={handleTaskDropToGroup}
+              getTaskCountForGroup={(groupId) => tasks.filter((t) => t.group_id === groupId && !t.completed).length}
+            />
+            {/* Optionally, if there are tasks but no groups, mention that TaskList will show them */}
+            {tasks.length > 0 && (
+                 <p className="text-sm text-muted-foreground mt-4">
+                    وظایف بدون گروه شما در لیست اصلی نمایش داده می‌شوند.
+                 </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <TaskGroupsBubbles
+              user={user}
+              guestUser={guestUser}
+              groups={groups}
+              selectedGroup={filterGroup}
+              onGroupSelect={setFilterGroup}
+              onGroupsChange={user ? loadGroups : () => setGroups([...localGroups])}
+              onTaskDrop={handleTaskDropToGroup}
+              getTaskCountForGroup={(groupId) => tasks.filter((t) => t.group_id === groupId && !t.completed).length}
+            />
 
-        {/* Tabs and Filters */}
-        <div className="mb-6 space-y-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex items-center justify-between mb-2">
-              <TabsList className="bg-muted/50">
+            {/* Tabs and Filters */}
+            <div className="mb-6 space-y-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <div className="flex items-center justify-between mb-2">
+                  <TabsList className="bg-muted/50">
                 <TabsTrigger value="all" className="data-[state=active]:bg-background">
                   <LayoutDashboard className="h-4 w-4 mr-1" />
                   همه

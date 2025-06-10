@@ -130,7 +130,7 @@ export default function TaskList({
                       transition={{ delay: 0.2 }}
                       className="text-center py-8 text-gray-500"
                     >
-                      <p className="text-sm">هیچ وظیفه‌ای در این گروه وجود ندارد</p>
+                      <p className="text-sm">✨ هنوز وظیفه‌ای وجود ندارد. یکی در بالا اضافه کنید!</p>
                     </motion.div>
                   )}
                 </div>
@@ -142,13 +142,9 @@ export default function TaskList({
     )
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Task Groups */}
-      {groups.map(renderTaskGroup)}
-
-      {/* Ungrouped Tasks */}
-      {ungroupedTasks.length > 0 && (
+  const renderUngroupedTasks = () => {
+    if (ungroupedTasks.length > 0) {
+      return (
         <Card className="border-gray-200">
           <CardHeader className="pb-3">
             <CardTitle className="text-gray-900">وظایف عمومی</CardTitle>
@@ -181,7 +177,43 @@ export default function TaskList({
             </AnimatePresence>
           </CardContent>
         </Card>
-      )}
+      );
+    }
+    // Show empty state for ungrouped tasks if there are no groups and no ungrouped tasks.
+    // This specific message will be shown if there are NO groups at all, and NO ungrouped tasks.
+    // If there ARE groups, but they are empty, their own empty messages will show.
+    // If there are no groups, but there ARE ungrouped tasks, then this won't show.
+    if (groups.length === 0 && ungroupedTasks.length === 0 && activeTasks.length === 0 && completedTasks.length === 0) {
+       return null; // The overall empty state will handle this
+    } else if (groups.length > 0 && ungroupedTasks.length === 0) {
+      // If there are groups, but the "Ungrouped" section specifically is empty, don't show a specific message for "Ungrouped"
+      // as the user might just be using groups.
+      return null;
+    } else if (ungroupedTasks.length === 0 && activeTasks.length > 0) {
+      // If there are active tasks in groups, but no ungrouped tasks, don't show empty state for ungrouped.
+      return null;
+    }
+
+
+    // Default empty state for ungrouped tasks if no other condition met to hide it.
+    // This case is tricky: show it if there are no groups and no tasks at all,
+    // or if there are groups (possibly with tasks) but specifically the ungrouped section is empty.
+    // The main "هیچ وظیفه‌ای وجود ندارد" will cover the absolute empty case.
+    // So, we only want to show this if there *could* be ungrouped tasks but there aren't.
+    // This is mostly for when a user *might* expect an ungrouped section but it's empty.
+    // However, the overall empty state at the end of the component is probably better.
+    // Let's simplify: only show ungrouped tasks if they exist. If not, this section is just not rendered.
+    // The main component empty state will handle the "no tasks at all" scenario.
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Task Groups */}
+      {groups.map(renderTaskGroup)}
+
+      {/* Ungrouped Tasks */}
+      {renderUngroupedTasks()}
 
       {/* Archive Section */}
       {completedTasks.length > 0 && (
@@ -243,14 +275,16 @@ export default function TaskList({
         </Card>
       )}
 
-      {/* Empty State */}
-      {activeTasks.length === 0 && (
+      {/* Empty State: Only show if there are no active tasks AND no completed tasks either (truly empty) */}
+      {tasks.length === 0 && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Archive className="w-8 h-8 text-gray-400" />
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-primary">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">هیچ وظیفه‌ای وجود ندارد</h3>
-          <p className="text-gray-500">برای شروع، وظیفه جدیدی اضافه کنید</p>
+          <h3 className="text-lg font-medium text-foreground mb-2">✨ هنوز هیچ وظیفه‌ای ایجاد نکرده‌اید.</h3>
+          <p className="text-muted-foreground">با کلیک بر روی دکمه "افزودن وظیفه جدید" در بالا شروع کنید!</p>
         </motion.div>
       )}
     </div>
