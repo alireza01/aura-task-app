@@ -3,6 +3,14 @@ import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/database.types'; // Assuming this path is correct
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
+
+const updateApiKeySchema = z.object({
+  name: z.string().max(255).optional().nullable(), // Allow null to remove name
+  is_active: z.boolean().optional(),
+}).refine(data => data.name !== undefined || data.is_active !== undefined, {
+  message: "At least one field (name or is_active) must be provided for update.",
+});
 
 // Helper function to check if user is admin (can be refactored into a shared util if not already)
 async function isAdmin(supabase: SupabaseClient<Database>) {
@@ -42,40 +50,31 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { is_active, name } = body;
+    const validation = updateApiKeySchema.safeParse(body);
 
-    const updatePayload: { is_active?: boolean; name?: string | null } = {};
-
-    if (typeof is_active === 'boolean') {
-      updatePayload.is_active = is_active;
-    } else if (is_active !== undefined) {
-      return NextResponse.json({ error: 'is_active must be a boolean.' }, { status: 400 });
+    if (!validation.success) {
+      console.error("API Validation Error:", validation.error.format());
+      return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
-    if (typeof name === 'string') {
-      if (name.length > 255) {
-        return NextResponse.json({ error: 'Name is too long.' }, { status: 400 });
-      }
+    const { name, is_active } = validation.data;
+    const updatePayload: { name?: string | null; is_active?: boolean } = {};
+
+    if (name !== undefined) {
       updatePayload.name = name;
-    } else if (name === null) {
-        updatePayload.name = null;
-    } else if (name !== undefined) {
-      return NextResponse.json({ error: 'Name must be a string or null.' }, { status: 400 });
     }
-
-    if (Object.keys(updatePayload).length === 0) {
-        return NextResponse.json({ error: 'No updatable fields provided (is_active or name).' }, { status: 400 });
+    if (is_active !== undefined) {
+      updatePayload.is_active = is_active;
     }
+    // The refine in the schema ensures at least one is present.
 
-    // Add updated_at manually as it's a good practice for PUT requests
-    // unless the trigger is absolutely guaranteed for all updates from any source.
-    // For this case, our schema has a trigger, so it might be redundant but explicit.
+    // Add updated_at manually if not handled by DB trigger for all updates.
+    // Our schema has a trigger, so this is likely not needed.
     // updatePayload.updated_at = new Date().toISOString();
-
 
     const { data, error } = await supabase
       .from('admin_api_keys')
-      .update(updatePayload)
+      .update(updatePayload as any) // Use 'as any' if Supabase types conflict with optional nulls
       .eq('id', key_id)
       .select()
       .single();

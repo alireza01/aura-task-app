@@ -1,13 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { z } from "zod";
+
+const assignGroupEmojiSchema = z.object({
+  groupName: z.string().min(1),
+  apiKey: z.string().min(1),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const { groupName, apiKey } = await request.json()
+    const body = await request.json();
+    const validation = assignGroupEmojiSchema.safeParse(body);
 
-    if (!groupName || !apiKey) {
-      return NextResponse.json({ error: "نام گروه و کلید API الزامی است" }, { status: 400 })
+    if (!validation.success) {
+      console.error("API Validation Error:", validation.error.format());
+      // Consider returning a specific error structure if your client expects it
+      return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
+
+    const { groupName, apiKey } = validation.data;
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })

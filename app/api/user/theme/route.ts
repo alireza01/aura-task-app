@@ -1,11 +1,26 @@
 // app/api/user/theme/route.ts
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+// import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Replaced
+import { createClient } from '@/lib/supabase/server'; // Use the server client
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const themeSchema = z.object({
+  theme: z.string().min(1), // Assuming theme name cannot be empty
+});
 
 export async function POST(request: Request) {
-  const { theme } = await request.json();
-  const supabase = createRouteHandlerClient({ cookies });
+  const body = await request.json();
+  const validation = themeSchema.safeParse(body);
+
+  if (!validation.success) {
+    console.error("API Validation Error:", validation.error.format());
+    return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
+  }
+
+  const { theme } = validation.data;
+  // const supabase = createRouteHandlerClient({ cookies }); // Replaced
+  const supabase = createClient(); // Uses cookies() internally
 
   const { data: { user } } = await supabase.auth.getUser();
 

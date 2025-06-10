@@ -8,24 +8,30 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 
 export function AccountActions({ user, profile }: { user: User; profile: UserProfile }) {
   const handleSignIn = async () => {
-    // 1. If the current user is a guest, store their ID for later.
-    if (profile.is_guest) {
-      console.log('Storing guest ID for potential merge:', user.id)
-      localStorage.setItem('GUEST_ID_TO_MERGE', user.id)
-    }
-
-    // 2. Proceed with the standard OAuth sign-in flow.
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+    if (user.is_anonymous) {
+      console.log('Linking anonymous user with Google');
+      await supabase.auth.linkUser({ // Updated to linkUser
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+    } else {
+      // Proceed with the standard OAuth sign-in flow for non-anonymous users
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+    }
   }
 
-  // If the user is a guest (based on the profile), show the sign-in/up card
-  if (profile.is_guest) {
+  // If the user is anonymous, show the sign-in/up card
+  // Assuming user.is_anonymous is the source of truth now.
+  // The profile prop might still be useful for other profile-specific info.
+  if (user.is_anonymous) {
     return (
       <Card>
         <CardHeader>

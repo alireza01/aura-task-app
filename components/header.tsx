@@ -39,12 +39,22 @@ export default function Header({ user, onSettingsChange, onSearch }: HeaderProps
     if (!supabaseClient) return
     setLoading(true)
     try {
-      await supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+      if (user?.is_anonymous) {
+        console.log('Linking anonymous user with Google');
+        await supabaseClient.auth.linkUser({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+      } else {
+        await supabaseClient.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+      }
     } catch (error) {
       console.error("خطا در ورود:", error)
     } finally {
