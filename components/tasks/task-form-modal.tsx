@@ -22,6 +22,7 @@ interface TaskFormModalProps {
   onClose: () => void
   onTaskSaved: () => void
   taskToEdit?: Task | null
+  isApiKeySet: boolean; // Add this prop
   initialTitle?: string
 }
 
@@ -35,6 +36,7 @@ export default function TaskFormModal({
   onClose,
   onTaskSaved,
   taskToEdit = null,
+  isApiKeySet, // Destructure
   initialTitle = "",
 }: TaskFormModalProps) {
   const [loading, setLoading] = useState(false)
@@ -263,6 +265,7 @@ export default function TaskFormModal({
                 loading={loading}
                 onSave={handleSaveTask}
                 onCancel={onClose}
+                isApiKeySet={isApiKeySet} // Pass down
                 isEditMode={isEditMode}
               />
             </motion.div>

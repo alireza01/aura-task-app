@@ -21,9 +21,10 @@ interface SettingsPanelProps {
   isOpen: boolean
   onClose: () => void
   onSettingsChange: () => void
+  isApiKeySet: boolean // Added prop
 }
 
-export default function SettingsPanel({ user, settings, isOpen, onClose, onSettingsChange }: SettingsPanelProps) {
+export default function SettingsPanel({ user, settings, isOpen, onClose, onSettingsChange, isApiKeySet }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState("ai")
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
@@ -108,9 +109,15 @@ export default function SettingsPanel({ user, settings, isOpen, onClose, onSetti
                 </TabsList>
 
                 <TabsContent value="ai" className="space-y-6 py-4">
-                  <ApiKeyManager user={user} settings={settings} onSettingsChange={handleSettingsChange} />
+                  <ApiKeyManager user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
+                  {/* Assuming ApiKeyManager is only for authenticated users */}
                   {user && !("isGuest" in user) && (
-                    <AiBehaviorCustomizer user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
+                    <AiBehaviorCustomizer
+                      user={user as User}
+                      settings={settings}
+                      onSettingsChange={handleSettingsChange}
+                      isApiKeySet={isApiKeySet} // Pass down
+                    />
                   )}
                 </TabsContent>
 

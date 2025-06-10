@@ -18,9 +18,10 @@ interface AiBehaviorCustomizerProps {
   user: User
   settings: UserSettings | null
   onSettingsChange: () => void
+  isApiKeySet: boolean // New prop
 }
 
-export default function AiBehaviorCustomizer({ user, settings, onSettingsChange }: AiBehaviorCustomizerProps) {
+export default function AiBehaviorCustomizer({ user, settings, onSettingsChange, isApiKeySet }: AiBehaviorCustomizerProps) {
   const [speedWeight, setSpeedWeight] = useState([50])
   const [importanceWeight, setImportanceWeight] = useState([50])
   const [autoRanking, setAutoRanking] = useState(true)
@@ -125,7 +126,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
               id="auto-ranking"
               checked={autoRanking}
               onCheckedChange={setAutoRanking}
-              disabled={loading || !settings?.gemini_api_key}
+              disabled={loading || !isApiKeySet}
             />
           </div>
           <div className="flex items-center justify-between">
@@ -137,7 +138,7 @@ export default function AiBehaviorCustomizer({ user, settings, onSettingsChange 
               id="auto-subtasks"
               checked={autoSubtasks}
               onCheckedChange={setAutoSubtasks}
-              disabled={loading || !settings?.gemini_api_key}
+              disabled={loading || !isApiKeySet}
             />
           </div>
         </div>

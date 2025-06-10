@@ -5,7 +5,7 @@ ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
 CREATE TABLE IF NOT EXISTS user_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  gemini_api_key TEXT,
+  encrypted_gemini_api_key TEXT, -- Renamed from gemini_api_key
   speed_weight INTEGER DEFAULT 50,
   importance_weight INTEGER DEFAULT 50,
   auto_ranking BOOLEAN DEFAULT true,

@@ -42,10 +42,6 @@ export default function ApiKeySetupModal({ user, isOpen, onClose, onApiKeySet }:
   const { toast } = useToast()
   const [supabaseClient, setSupabaseClient] = useState<any>(null)
 
-  useEffect(() => {
-    setSupabaseClient(createClient())
-  }, [])
-
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -109,18 +105,32 @@ export default function ApiKeySetupModal({ user, isOpen, onClose, onApiKeySet }:
     setError("")
 
     try {
-      // Save API key to user settings
-      if (!supabaseClient) throw new Error("Supabase client not initialized")
-      const { error: updateError } = await supabaseClient.from("user_settings").upsert({
-        user_id: user.id,
-        gemini_api_key: apiKeyInput.trim(),
-        updated_at: new Date().toISOString(),
-      })
+    // 1. Test the API key first (using the public /api/test-gemini endpoint)
+    const testResponse = await fetch("/api/test-gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+    });
 
-      if (updateError) {
-        throw updateError
+    if (!testResponse.ok) {
+      const testError = await testResponse.json();
+      throw new Error(testError.error || "کلید API نامعتبر است یا اعتبارسنجی آن با شکست مواجه شد.");
       }
 
+    // 2. If test is successful, then save via the new protected endpoint
+    const saveResponse = await fetch("/api/user/api-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+    });
+
+    if (!saveResponse.ok) {
+      const saveError = await saveResponse.json();
+      throw new Error(saveError.error || "خطا در ذخیره کلید API.");
+    }
+
+    // Remove skipped flag if user now sets a key
+    localStorage.removeItem("aura-task-api-key-setup-skipped");
       setSuccess(true)
       toast({
         title: "موفقیت!",

@@ -39,9 +39,10 @@ interface TaskFormProps {
   guestUser: GuestUser | null
   groups: TaskGroup[]
   tags: Tag[]
-  settings: UserSettings | null
+  settings: UserSettings | null // settings might still be useful for other non-AI related preferences
   taskToEdit?: Task | null
   initialTitle?: string
+  isApiKeySet: boolean // New prop
   loading: boolean
   onSave: (data: any) => void
   onCancel: () => void
@@ -60,10 +61,11 @@ export default function TaskForm({
   onSave,
   onCancel,
   isEditMode,
+  isApiKeySet, // Destructure new prop
 }: TaskFormProps) {
   const [subtasks, setSubtasks] = useState<string[]>([])
   const [aiProcessing, setAiProcessing] = useState(false)
-  const canUseAI = user && settings?.gemini_api_key
+  const canUseAI = user && isApiKeySet; // Use the new prop here
 
   const {
     register,
@@ -74,7 +76,7 @@ export default function TaskForm({
   } = useForm<TaskFormData>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
-      title: taskToEdit?.title || initialTitle,
+      title: isEditMode ? taskToEdit?.title || "" : initialTitle,
       description: taskToEdit?.description || "",
       groupId: taskToEdit?.group_id || "",
       speedScore: taskToEdit?.speed_score || 10,
