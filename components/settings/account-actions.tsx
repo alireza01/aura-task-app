@@ -1,17 +1,15 @@
-// In components/settings/account-actions.tsx
-
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import type { User, UserProfile } from '@/types' // Ensure UserProfile is imported if not already
 import { Chrome } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 
-export function AccountActions({ user }: { user: User & { is_guest?: boolean } }) {
+export function AccountActions({ user, profile }: { user: User; profile: UserProfile }) {
   const handleSignIn = async () => {
     // 1. If the current user is a guest, store their ID for later.
-    if (user.is_guest) {
+    if (profile.is_guest) {
       console.log('Storing guest ID for potential merge:', user.id)
       localStorage.setItem('GUEST_ID_TO_MERGE', user.id)
     }
@@ -26,8 +24,8 @@ export function AccountActions({ user }: { user: User & { is_guest?: boolean } }
     })
   }
 
-  // If the user is a guest, show the sign-in/up card
-  if (user.is_guest) {
+  // If the user is a guest (based on the profile), show the sign-in/up card
+  if (profile.is_guest) {
     return (
       <Card>
         <CardHeader>
@@ -47,6 +45,15 @@ export function AccountActions({ user }: { user: User & { is_guest?: boolean } }
     )
   }
 
-  // ... rest of your component for logged-in users
-  return null
+  // This part is for signed-in (non-guest) users
+  return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Account</CardTitle>
+          <CardDescription>
+            You are signed in as {user.email}.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+  );
 }

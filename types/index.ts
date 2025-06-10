@@ -104,3 +104,17 @@ export interface TaskFormData {
   emoji?: string
   subtasks?: string[]
 }
+
+// Add this interface to your types/index.ts file
+
+export interface UserProfile {
+    user_id: string;
+    role: string;
+    is_guest: boolean;
+    nickname: string | null;
+    has_set_nickname: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+// ... rest of the file
