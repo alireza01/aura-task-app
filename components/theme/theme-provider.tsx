@@ -3,9 +3,11 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/auth-helpers-nextjs"
 import CustomCursor from "./custom-cursor"
+
+const supabase = createClient()
 
 type Theme = "default" | "alireza" | "neda"
 
@@ -86,13 +88,8 @@ export function ThemeProvider({ children, defaultTheme = "default" }: ThemeProvi
         if (data?.theme) {
           setTheme(data.theme as Theme) // Apply the fetched theme.
         }
-      } else {
-        // If no user, try to load theme from localStorage (for guest users).
-        const savedTheme = localStorage.getItem("aura-theme") as Theme
-        if (savedTheme) {
-          setTheme(savedTheme) // Apply the saved theme.
-        }
       }
+      // If no user, the theme remains defaultTheme.
     }
 
     loadTheme() // Call the async function to load the theme.
@@ -117,10 +114,8 @@ export function ThemeProvider({ children, defaultTheme = "default" }: ThemeProvi
         theme,
         updated_at: new Date().toISOString(), // Record the update timestamp.
       })
-    } else {
-      // For guest users, save the theme to localStorage.
-      localStorage.setItem("aura-theme", theme)
     }
+    // For guest users, theme changes are not persisted.
   }, [theme, user, supabase]) // Re-run this effect when 'theme', 'user', or 'supabase' changes.
 
   /**

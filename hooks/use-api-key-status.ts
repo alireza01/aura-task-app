@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/auth-helpers-nextjs"
+
+const supabase = createClient()
 
 /**
  * Custom React hook to check and manage the status of a user's Gemini API key.
