@@ -21,6 +21,16 @@ export default function SignInPromptModal({ onClose, onSignIn }: SignInPromptMod
     if (!supabaseClient) return
     setLoading(true)
     try {
+      // Check for guest conversion
+      const { data: { user: currentGuestUser } } = await supabaseClient.auth.getUser();
+      if (currentGuestUser && currentGuestUser.email?.endsWith('@auratask.guest')) {
+        // console.log("Attempting guest conversion for:", currentGuestUser.email);
+        sessionStorage.setItem('guest_conversion_attempt', 'true');
+      } else {
+        // console.log("Not a guest conversion or no user found.");
+        sessionStorage.removeItem('guest_conversion_attempt');
+      }
+
       await supabaseClient.auth.signInWithOAuth({
         provider: "google",
         options: {
