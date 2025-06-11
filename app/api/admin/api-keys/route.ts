@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
-import { Database } from '@/lib/database.types'; // Assuming this path is correct
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { checkAdminRole } from '@/lib/auth/utils';
 import { serverLogger } from '@/lib/logger';
@@ -12,8 +9,8 @@ const createApiKeySchema = z.object({
   name: z.string().max(255).optional().nullable(),
 });
 
-export async function GET(request: Request) {
-  const supabase = createClient(cookies());
+export async function GET() {
+  const supabase = createClient();
 
   if (!(await checkAdminRole(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
@@ -38,7 +35,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const supabase = createClient(cookies());
+  const supabase = createClient();
 
   if (!(await checkAdminRole(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
