@@ -58,7 +58,6 @@ export async function PUT(
 
 // DELETE an API Key
 export async function DELETE(
-  request: Request,
   { params }: { params: { key_id: string } }
 ) {
   const supabase = createClient();
