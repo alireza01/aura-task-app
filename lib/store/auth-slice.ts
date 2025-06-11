@@ -137,48 +137,59 @@ export const createAuthSlice = (
     },
 
     initializeAuthListener: () => {
+      // Only set up the listener if not already initialized
+      if (get().isInitialized) {
+        return () => {}; // Return empty cleanup if already initialized
+      }
+
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => { // Made async to await loadUserProfile
-          console.log('Auth event:', event, session);
+        async (event, session) => {
           const currentUser = get().user;
           const user = session?.user ?? null;
 
-          if (user?.id && user.id !== currentUser?.id) { // User logged in or changed
-            set({ user, isLoadingAuth: true });
-            await get().loadUserProfile(user.id); // Load profile
-            // userProfile is now set
-            get().setUserAndProfile(user, get().userProfile);
-            get().setUser(user); // For other slices
-            get().initializeTaskSubscriptions();
-            get().initializeGroupSubscriptions();
-            get().initializeTagSubscriptions();
-            set({ isLoadingAuth: false, isInitialized: true });
-          } else if (!user && currentUser) { // User logged out
-            set({ user: null, userProfile: null, isLoadingAuth: false, isInitialized: true });
-            get().setUserAndProfile(null, null);
-            get().setUser(null); // For other slices
-          } else if (user && event === 'USER_UPDATED') {
-            // If user metadata changed, profile might need an update
-            set({ user }); // Update user object itself
-            await get().loadUserProfile(user.id);
-            get().setUserAndProfile(user, get().userProfile); // Update tasksSlice
-            get().setUser(user); // Update other slices that might depend on user object
-          } else if (event === 'INITIAL_SESSION' && !user) {
-            // Initial session but no user, ensure everything is cleared and initialized
-            set({ user: null, userProfile: null, isInitialized: true, isLoadingAuth: false });
-            get().setUserAndProfile(null, null);
-            get().setUser(null);
+          // Handle different auth events
+          switch (event) {
+            case 'SIGNED_IN':
+            case 'USER_UPDATED':
+              if (user?.id && user.id !== currentUser?.id) {
+                set({ user, isLoadingAuth: true });
+                await get().loadUserProfile(user.id);
+                get().setUserAndProfile(user, get().userProfile);
+                get().setUser(user);
+                get().initializeTaskSubscriptions();
+                get().initializeGroupSubscriptions();
+                get().initializeTagSubscriptions();
+                set({ isLoadingAuth: false, isInitialized: true });
+              }
+              break;
+
+            case 'SIGNED_OUT':
+              if (currentUser) {
+                set({ user: null, userProfile: null, isLoadingAuth: false, isInitialized: true });
+                get().setUserAndProfile(null, null);
+                get().setUser(null);
+              }
+              break;
+
+            case 'INITIAL_SESSION':
+              if (!user) {
+                set({ user: null, userProfile: null, isInitialized: true, isLoadingAuth: false });
+                get().setUserAndProfile(null, null);
+                get().setUser(null);
+              }
+              break;
           }
-          // Ensure isInitialized is true after first event if not already set by checkInitialSession
+
+          // Ensure isInitialized is true after first event
           if (!get().isInitialized) {
             set({ isInitialized: true });
           }
         }
       );
 
-      // Initial check in case the event listener fires after the initial state is already set up.
+      // Initial check in case the event listener fires after the initial state is already set up
       if (!get().isInitialized) {
-         get().checkInitialSession(); // This will also call the inter-slice setters
+        get().checkInitialSession();
       }
 
       return () => {

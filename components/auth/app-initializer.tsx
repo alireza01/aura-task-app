@@ -1,7 +1,7 @@
 // components/auth/app-initializer.tsx
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 // Supabase client is not directly used here anymore, authSlice handles it.
 // import { supabase } from '@/lib/supabase/client';
 import { useAppStore } from '@/lib/store'; // Import the new Zustand store
@@ -17,14 +17,9 @@ export default function AppInitializer() {
   const currentThemeFromStore = useAppStore(state => state.theme);
   const { setTheme: applyThemeToNextThemes } = useNextTheme();
 
-  useEffect(() => {
-    // Initialize the auth listener.
-    // The initializeAuthListener action in authSlice is responsible for:
-    // 1. Setting up the onAuthStateChange listener.
-    // 2. Calling checkInitialSession internally if auth state isn't initialized yet.
-    // This simplifies AppInitializer significantly.
+  // Memoize the auth listener initialization to prevent recreation on each render
+  const setupAuthListener = useCallback(() => {
     const unsubscribe = initializeAuthListener();
-
     return () => {
       if (unsubscribe) {
         unsubscribe();
@@ -32,10 +27,13 @@ export default function AppInitializer() {
     };
   }, [initializeAuthListener]);
 
+  // Initialize auth listener only once on mount
   useEffect(() => {
-    // This effect ensures that whenever the theme changes in the Zustand store
-    // (e.g., loaded from user settings by settingsSlice, or changed by ThemeSelector),
-    // it's applied to the DOM via next-themes.
+    return setupAuthListener();
+  }, [setupAuthListener]);
+
+  // Apply theme changes when store theme changes
+  useEffect(() => {
     if (currentThemeFromStore) {
       applyThemeToNextThemes(currentThemeFromStore);
     }

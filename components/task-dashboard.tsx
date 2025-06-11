@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react'; // useMemo removed
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // useMemo removed
 import { supabase } from '@/lib/supabase/client'; // Import the supabase instance
 import type { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
 import type { Task, Tag, Subtask, UserSettings } from '@/types'; // Removed unused types, kept UserSettings for reconstruction
@@ -43,8 +43,7 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
 
   // Tasks State & Actions from Store
   const {
-    tasks: tasks_raw, // Renamed to avoid conflict with local component variables if any
-    filteredTasks,
+    tasks: tasks_raw,
     loadingTasks,
     searchQuery,
     filterGroup,
@@ -54,7 +53,6 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
     activeTab,
   } = useAppStore(state => ({
     tasks: state.tasks,
-    filteredTasks: state.filteredTasks,
     loadingTasks: state.loadingTasks,
     activeDragId: state.activeDragId,
     searchQuery: state.searchQuery,
@@ -64,6 +62,18 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
     filterTag: state.filterTag,
     activeTab: state.activeTab,
   }));
+
+  // Memoize filtered tasks to prevent infinite updates
+  const filteredTasks = useMemo(() => {
+    const store = useAppStore.getState();
+    return store.getFilteredTasks();
+  }, [tasks_raw, searchQuery, filterGroup, filterStatus, filterPriority, filterTag, activeTab]);
+
+  // Memoize task counts to prevent unnecessary recalculations
+  const taskCounts = useMemo(() => ({
+    pending: filteredTasks.filter(t => !t.completed).length,
+    total: filteredTasks.length
+  }), [filteredTasks]);
 
   const {
     setActiveDragId,
@@ -78,7 +88,6 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
     handleTaskDropToGroup: storeHandleTaskDropToGroup,
     reorderTasks: storeReorderTasks,
     canAddTask: canAddTaskSelector,
-    // loadTasks: storeLoadTasks, // If manual refresh is needed
   } = useAppStore(state => ({
     setActiveDragId: state.setActiveDragId,
     setSearchQuery: state.setSearchQuery,
@@ -92,7 +101,6 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
     handleTaskDropToGroup: state.handleTaskDropToGroup,
     reorderTasks: state.reorderTasks,
     canAddTask: state.canAddTask,
-    // loadTasks: state.loadTasks,
   }));
 
   // Groups State from Store
@@ -345,7 +353,7 @@ export default function TaskDashboard({ /* user: initialUser */ }: TaskDashboard
                    (userProfile && !userProfile.is_guest && user?.email) ? `، ${user.email.split('@')[0]}` :
                    (userProfile?.is_guest) ? "، مهمان" : ""}
             </h1>
-            <p className="text-muted-foreground">{filteredTasks.filter(t => !t.completed).length} وظیفه در انتظار انجام</p>
+            <p className="text-muted-foreground">{taskCounts.pending} وظیفه در انتظار انجام</p>
           </div>
           <Button onClick={handleAddTask} className="mb-4 w-full md:w-auto"><Plus className="h-4 w-4 ml-2" /> افزودن وظیفه جدید</Button>
           {/* Use contentLoading for subsequent loading states, not initialPageLoading */}
