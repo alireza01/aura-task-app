@@ -7,7 +7,7 @@ import { checkAdminRole } from '@/lib/auth/utils';
 import { serverLogger } from '@/lib/logger';
 
 export async function GET(request: Request) {
-  const supabase = createClient(cookies());
+  const supabase = createClient();
 
   if (!(await checkAdminRole(supabase))) {
     return NextResponse.json({ error: 'Forbidden: User is not an admin.' }, { status: 403 });
