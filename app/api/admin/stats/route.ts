@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
-import { Database } from '@/lib/database.types';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkAdminRole } from '@/lib/auth/utils';
 import { serverLogger } from '@/lib/logger';
 
