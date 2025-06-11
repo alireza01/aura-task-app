@@ -1,0 +1,159 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import type { User } from "@supabase/supabase-js"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { motion, AnimatePresence } from "framer-motion"
+import { X } from "lucide-react"
+
+import ApiKeyManager from "@/components/settings/api-key-manager"
+import AiBehaviorCustomizer from "@/components/settings/ai-behavior-customizer"
+import { ThemeSelector } from "@/components/settings/theme-selector" // Changed to named import
+import { AccountActions } from "@/components/settings/account-actions"
+import AdminSettingsSection from "@/components/settings/admin" // Added import
+import type { UserSettings, UserProfile } from "@/types"
+
+interface SettingsPanelProps {
+  user: User | null
+  profile: UserProfile | null
+  settings: UserSettings | null
+  isOpen: boolean
+  onClose: () => void
+  onSettingsChange: () => void
+}
+
+export default function SettingsPanel({ user, profile, settings, isOpen, onClose, onSettingsChange }: SettingsPanelProps) {
+  const [activeTab, setActiveTab] = useState("ai")
+  const [hasChanges, setHasChanges] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false) // Added isAdmin state
+
+  // Reset state when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      setHasChanges(false)
+      // Fetch admin status when panel is opened and user is present
+      if (user && !("isGuest" in user)) {
+        fetch("/api/auth/me/role")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.role === "admin") {
+              setIsAdmin(true)
+            } else {
+              setIsAdmin(false)
+            }
+          })
+          .catch(() => {
+            setIsAdmin(false) // Default to false on error
+            console.error("Failed to fetch user role for admin check.")
+          })
+      } else {
+        setIsAdmin(false) // Not an admin if not logged in or guest
+      }
+    }
+  }, [isOpen, user])
+
+  // Handle escape key to close panel
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        if (hasChanges) {
+          // Ask for confirmation if there are unsaved changes
+          const confirmed = window.confirm(
+            "تغییرات ذخیره نشده دارید. آیا مطمئن هستید که می‌خواهید بدون ذخیره خارج شوید؟",
+          )
+          if (confirmed) {
+            onClose()
+          }
+        } else {
+          onClose()
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape)
+    return () => window.removeEventListener("keydown", handleEscape)
+  }, [isOpen, hasChanges, onClose])
+
+  const handleSettingsChange = () => {
+    setHasChanges(true)
+    onSettingsChange()
+  }
+
+  const handleClose = () => {
+    if (hasChanges) {
+      // Ask for confirmation if there are unsaved changes
+      const confirmed = window.confirm("تغییرات ذخیره نشده دارید. آیا مطمئن هستید که می‌خواهید بدون ذخیره خارج شوید؟")
+      if (confirmed) {
+        onClose()
+      }
+    } else {
+      onClose()
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto glass-card border-0">
+            <DialogHeader className="flex flex-row-reverse items-center justify-between">
+              <DialogTitle className="text-xl font-semibold">تنظیمات</DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClose}
+                className="h-8 w-8 rounded-full"
+                aria-label="بستن تنظیمات"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogHeader>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="mt-4"
+            >
+              <Tabs defaultValue="ai" value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="ai">هوش مصنوعی</TabsTrigger>
+                  <TabsTrigger value="appearance">ظاهر</TabsTrigger>
+                  <TabsTrigger value="account">حساب کاربری</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="ai" className="space-y-6 py-4">
+                  <ApiKeyManager />
+                  {user && !("isGuest" in user) && (
+                    <AiBehaviorCustomizer user={user as User} settings={settings} onSettingsChange={handleSettingsChange} />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="appearance" className="space-y-6 py-4">
+                  <ThemeSelector />
+                  {/* Props user, settings, onSettingsChange removed for now as component doesn't accept them, may need to be re-added if component is updated */}
+                </TabsContent>
+
+                <TabsContent value="account" className="space-y-6 py-4">
+                  {user && profile && (
+                    <AccountActions user={user} profile={profile} />
+                  )}
+                </TabsContent>
+              </Tabs>
+
+              {/* Admin Section */}
+              {isAdmin && (
+                <div className="mt-8 pt-6 border-t">
+                  <AdminSettingsSection />
+                </div>
+              )}
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </AnimatePresence>
+  )
+}
