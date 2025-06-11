@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { serverLogger } from "@/lib/logger";
@@ -11,8 +10,7 @@ const assignGroupEmojiSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -26,7 +24,7 @@ export async function POST(request: NextRequest) {
     const validation = assignGroupEmojiSchema.safeParse(body);
 
     if (!validation.success) {
-      serverLogger.error("API Validation Error", { groupName: body?.groupName }, validation.error);
+      serverLogger.error("API Validation Error", { groupName: body?.groupName, error: validation.error });
       return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
@@ -71,7 +69,7 @@ export async function POST(request: NextRequest) {
           serverLogger.info(`Assign Group Emoji: Successfully assigned emoji with ${keyType} key.`, { keyType, adminKeyId, groupName, assignedEmoji });
           if (keyType === 'admin' && adminKeyId) {
             supabase.from('admin_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', adminKeyId)
-              .then(({ error }) => { if (error) serverLogger.warn(`Failed to update last_used_at for admin key ${adminKeyId}`, { adminKeyId }, error); });
+              .then(({ error }) => { if (error) serverLogger.warn(`Failed to update last_used_at for admin key ${adminKeyId}`, { adminKeyId }); });
           }
           return true;
         } else {
@@ -80,7 +78,7 @@ export async function POST(request: NextRequest) {
         }
       } catch (apiError: unknown) {
         const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
-        serverLogger.warn(`Assign Group Emoji: API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'})`, { keyType, adminKeyId, groupName, errorMessage }, apiError as Error);
+        serverLogger.warn(`Assign Group Emoji: API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'})`, { keyType, adminKeyId, groupName, errorMessage });
         if (errorMessage && (errorMessage.includes('API key not valid') || errorMessage.includes('API key is invalid') || errorMessage.includes('quota'))) {
           if (keyType === 'user') {
             serverLogger.info("Assign Group Emoji: User API key failed with auth/quota error.", { userId, groupName });
@@ -94,17 +92,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let userKeyAttemptedAndFailedAuth = false;
     if (userApiKey) {
       serverLogger.info("Assign Group Emoji: Attempting with user API key.", { userId, groupName });
       success = await attemptApiCall(userApiKey, 'user');
-      if (!success && userApiKey) { // Check if it specifically failed (not just was empty)
-         // A more robust check here would be if attemptApiCall threw an auth error for the user key
-         // For simplicity now, any failure with user key (if present) will lead to checking if it was auth-like
-         // This part needs careful thought: if user key is invalid, we want to try admin. If it's other error, maybe not.
-         // The current attemptApiCall returns false for auth errors, allowing fallback.
-         userKeyAttemptedAndFailedAuth = !success; // If it failed, it might be an auth error (or other error handled as non-blocking)
-      }
     }
 
     if (!success) {
@@ -115,7 +105,7 @@ export async function POST(request: NextRequest) {
         .eq("is_active", true);
 
       if (adminKeysError) {
-        serverLogger.error("Assign Group Emoji: Error fetching admin API keys", { userId, groupName }, adminKeysError);
+        serverLogger.error("Assign Group Emoji: Error fetching admin API keys", { userId, groupName });
       }
 
       if (adminKeysData && adminKeysData.length > 0) {
@@ -140,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    serverLogger.error("Assign Group Emoji: Main error handler", { userId, groupName, errorMessage }, error as Error);
+    serverLogger.error("Assign Group Emoji: Main error handler", { userId, errorMessage }, error as Error);
     return NextResponse.json({ emoji: "📁" }); // Fallback emoji
   }
 }

@@ -9,15 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import type { Tag, User } from "@/types"
+import type { Tag } from "@/types"
 import { TagIcon, Plus, Trash2, Edit3 } from "lucide-react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface TagsModalProps {
-  user: User | null
   tags: Tag[]
   onClose: () => void
   onTagsChange: () => void
@@ -32,7 +30,7 @@ const tagColors = [
   { name: "نارنجی", value: "orange" as const },
 ]
 
-export default function TagsModal({ user, tags, onClose, onTagsChange }: TagsModalProps) {
+export default function TagsModal({ tags, onClose, onTagsChange }: TagsModalProps) {
   const [newTagName, setNewTagName] = useState("")
   const [newTagColor, setNewTagColor] = useState<Tag["color"]>("blue")
   const [editingTag, setEditingTag] = useState<Tag | null>(null)

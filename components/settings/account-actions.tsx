@@ -1,36 +1,23 @@
 'use client'
 
-import { supabase } from '@/lib/supabase/client' // Changed import
-import type { User, UserProfile } from '@/types' // Ensure UserProfile is imported if not already
+import { supabase } from '@/lib/supabase/client'
+import type { User, UserProfile } from '@/types'
 import { Chrome } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 
 export function AccountActions({ user, profile }: { user: User; profile: UserProfile }) {
   const handleSignIn = async () => {
-    // const supabase = createClient() // Removed, use imported supabase directly
-    if (user.is_anonymous) {
-      console.log('Linking anonymous user with Google');
-      await supabase.auth.linkUser({ // Updated to linkUser
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-    } else {
-      // Proceed with the standard OAuth sign-in flow for non-anonymous users
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-    }
+    // Use signInWithOAuth for both anonymous and non-anonymous users
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
   }
 
   // If the user is anonymous, show the sign-in/up card
-  // Assuming user.is_anonymous is the source of truth now.
-  // The profile prop might still be useful for other profile-specific info.
   if (user.is_anonymous) {
     return (
       <Card>
@@ -57,7 +44,7 @@ export function AccountActions({ user, profile }: { user: User; profile: UserPro
         <CardHeader>
           <CardTitle>Account</CardTitle>
           <CardDescription>
-            You are signed in as {user.email}.
+            You are signed in as {profile?.nickname || user.email}.
           </CardDescription>
         </CardHeader>
       </Card>

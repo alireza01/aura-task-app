@@ -1,7 +1,5 @@
 import { POST } from './route'; // Assuming route.ts is in the same directory or adjust path
 import { NextRequest } from 'next/server';
-import { cookies } from 'next/headers'; // Mocked
-import { createClient } from '@/lib/supabase/server'; // Mocked
 import { GoogleGenerativeAI } from '@google/generative-ai'; // Mocked
 
 // --- Mocks ---
@@ -82,8 +80,7 @@ describe('POST /api/process-task', () => {
     }));
     mockSupabaseEq.mockImplementation(() => ({
       single: mockSupabaseSingle,
-      // also handles non-single results like for admin_api_keys
-      then: (callback) => Promise.resolve(callback({ data: [], error: null })), // Default for .then() if not chained to single()
+      then: (callback: (data: { data: any[]; error: null }) => any) => Promise.resolve(callback({ data: [], error: null })),
     }));
     mockSupabaseSingle.mockResolvedValue({ data: null, error: null });
     mockSupabaseUpdate.mockResolvedValue({ error: null }); // Default for admin key update
@@ -107,7 +104,7 @@ describe('POST /api/process-task', () => {
 
   it('should process with user API key if available and valid', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementationOnce((column, value) => { // For user_settings
+    mockSupabaseEq.mockImplementationOnce((column: string, value: string) => {
       if (column === 'user_id' && value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_valid_key' }, error: null }) };
       }
@@ -126,11 +123,11 @@ describe('POST /api/process-task', () => {
 
   it('should fallback to admin key if user key is missing', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementation((column, value) => {
-      if (column === 'user_id') { // user_settings
+    mockSupabaseEq.mockImplementation((column: string) => {
+      if (column === 'user_id') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: null }, error: null }) };
       }
-      if (column === 'is_active') { // admin_api_keys
+      if (column === 'is_active') {
         return Promise.resolve({ data: [{ id: 'admin-key-1', api_key: 'admin_valid_key' }], error: null });
       }
       return { single: () => Promise.resolve({ data: null, error: null }) };
@@ -149,9 +146,9 @@ describe('POST /api/process-task', () => {
 
   it('should fallback to admin key if user key fails with auth error', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementation((column, value) => { // For user_settings and admin_keys
+    mockSupabaseEq.mockImplementation((column: string) => {
       if (column === 'user_id') {
-         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_invalid_key' }, error: null }) };
+        return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_invalid_key' }, error: null }) };
       }
       if (column === 'is_active') {
         return Promise.resolve({ data: [{ id: 'admin-key-1', api_key: 'admin_valid_key' }], error: null });
@@ -187,7 +184,7 @@ describe('POST /api/process-task', () => {
 
   it('should NOT fallback to admin key if user key fails with non-auth error (e.g., safety)', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementationOnce((column, value) => { // For user_settings
+    mockSupabaseEq.mockImplementationOnce((column: string, value: string) => { // For user_settings
       if (column === 'user_id' && value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_valid_key_safety_issue' }, error: null }) };
       }
@@ -213,7 +210,7 @@ describe('POST /api/process-task', () => {
 
   it('should return 503 if no API keys are available and AI features are requested', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementation((column, value) => {
+    mockSupabaseEq.mockImplementation((column: string) => {
       if (column === 'user_id') { // user_settings
         return { single: () => Promise.resolve({ data: { gemini_api_key: null }, error: null }) };
       }
@@ -234,7 +231,7 @@ describe('POST /api/process-task', () => {
   it('should return default result if AI features are disabled', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
     // User settings might have weights but no API key
-    mockSupabaseEq.mockImplementationOnce((column, value) => {
+    mockSupabaseEq.mockImplementationOnce((column: string, value: string) => {
       if (column === 'user_id' && value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: null, speed_weight: 60, importance_weight: 40 }, error: null }) };
       }

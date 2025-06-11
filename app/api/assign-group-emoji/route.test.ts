@@ -1,7 +1,5 @@
 import { POST } from './route';
 import { NextRequest } from 'next/server';
-import { cookies } from 'next/headers'; // Mocked
-import { createClient } from '@/lib/supabase/server'; // Mocked
 import { GoogleGenerativeAI } from '@google/generative-ai'; // Mocked
 
 // --- Mocks ---
@@ -63,10 +61,10 @@ describe('POST /api/assign-group-emoji', () => {
     mockSupabaseSelect.mockImplementation(() => ({
       eq: mockSupabaseEq,
     }));
-    mockSupabaseEq.mockImplementation(() => ({
+    mockSupabaseEq.mockImplementation((_column, _value) => ({
       single: mockSupabaseSingle,
-       // also handles non-single results like for admin_api_keys
-      then: (callback) => Promise.resolve(callback({ data: [], error: null })),
+      // also handles non-single results like for admin_api_keys
+      then: (callback: (result: { data: any[]; error: null }) => any) => Promise.resolve(callback({ data: [], error: null })),
     }));
     mockSupabaseSingle.mockResolvedValue({ data: null, error: null });
     mockSupabaseUpdate.mockResolvedValue({ error: null });
@@ -87,8 +85,8 @@ describe('POST /api/assign-group-emoji', () => {
 
   it('should assign emoji using user API key if available', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementationOnce((column, value) => { // For user_settings
-      if (column === 'user_id' && value === 'user-123') {
+    mockSupabaseEq.mockImplementationOnce((column, _value) => { // For user_settings
+      if (column === 'user_id' && _value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_valid_key' }, error: null }) };
       }
       return { single: () => Promise.resolve({ data: null, error: null }) };
@@ -106,7 +104,7 @@ describe('POST /api/assign-group-emoji', () => {
 
   it('should fallback to admin key if user key is missing', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementation((column, value) => {
+    mockSupabaseEq.mockImplementation((column, _value) => {
       if (column === 'user_id') { // user_settings
         return { single: () => Promise.resolve({ data: { gemini_api_key: null }, error: null }) };
       }
@@ -129,9 +127,9 @@ describe('POST /api/assign-group-emoji', () => {
 
   it('should fallback to admin key if user key fails with auth error', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementation((column, value) => {
+    mockSupabaseEq.mockImplementation((column, _value) => {
       if (column === 'user_id') {
-         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_invalid_key' }, error: null }) };
+        return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_invalid_key' }, error: null }) };
       }
       if (column === 'is_active') {
         return Promise.resolve({ data: [{ id: 'admin-key-1', api_key: 'admin_valid_key' }], error: null });
@@ -164,10 +162,10 @@ describe('POST /api/assign-group-emoji', () => {
     expect(mockSupabaseUpdate).toHaveBeenCalled();
   });
 
-  it('should use fallback emoji if user key fails with non-auth error (no admin fallback for this type of error in emoji assign)', async () => {
+  it('should use fallback emoji if user key fails with non-auth error', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementationOnce((column, value) => {
-      if (column === 'user_id' && value === 'user-123') {
+    mockSupabaseEq.mockImplementation((column, _value) => {
+      if (column === 'user_id' && _value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_valid_key_safety_issue' }, error: null }) };
       }
       return { single: () => Promise.resolve({ data: null, error: null }) };
@@ -190,10 +188,9 @@ describe('POST /api/assign-group-emoji', () => {
     expect(mockSupabaseUpdate).not.toHaveBeenCalled();
   });
 
-
   it('should return fallback emoji if no API keys are available', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementation((column, value) => {
+    mockSupabaseEq.mockImplementation((column, _value) => {
       if (column === 'user_id') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: null }, error: null }) };
       }
@@ -223,8 +220,8 @@ describe('POST /api/assign-group-emoji', () => {
 
   it('should correctly parse a valid emoji from AI', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementationOnce((column, value) => {
-      if (column === 'user_id' && value === 'user-123') {
+    mockSupabaseEq.mockImplementationOnce((column, _value) => {
+      if (column === 'user_id' && _value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_valid_key' }, error: null }) };
       }
       return { single: () => Promise.resolve({ data: null, error: null }) };
@@ -241,8 +238,8 @@ describe('POST /api/assign-group-emoji', () => {
 
   it('should use fallback emoji if AI returns invalid/non-emoji string', async () => {
     mockSupabaseGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    mockSupabaseEq.mockImplementationOnce((column, value) => {
-      if (column === 'user_id' && value === 'user-123') {
+    mockSupabaseEq.mockImplementationOnce((column, _value) => {
+      if (column === 'user_id' && _value === 'user-123') {
         return { single: () => Promise.resolve({ data: { gemini_api_key: 'user_valid_key' }, error: null }) };
       }
       return { single: () => Promise.resolve({ data: null, error: null }) };
@@ -256,5 +253,4 @@ describe('POST /api/assign-group-emoji', () => {
     expect(response.status).toBe(200);
     expect(json.emoji).toBe('📁');
   });
-
 });

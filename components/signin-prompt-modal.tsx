@@ -25,7 +25,7 @@ export default function SignInPromptModal({ onClose, onSignIn }: SignInPromptMod
 
       if (user?.is_anonymous) {
         console.log('Linking anonymous user with Google');
-        await supabaseClient.auth.linkUser({
+        await supabaseClient.auth.linkIdentity({
           provider: "google",
           options: {
             redirectTo: `${window.location.origin}/auth/callback`,

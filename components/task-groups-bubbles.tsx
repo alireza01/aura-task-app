@@ -9,7 +9,6 @@ import type { TaskGroup, User } from "@/types"
 import { Plus } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { useLocalStorage } from "@/hooks/use-local-storage"
 import { toast } from "sonner"
 import { useAppStore } from '@/lib/store'; // Added Zustand store import
 import GroupFormModal from "./groups/group-form-modal"
@@ -196,7 +195,6 @@ export default function TaskGroupsBubbles({
                   settings={null}
                   taskCount={getTaskCountForGroup(group.id)}
                   onGroupsChange={onGroupsChange}
-                  // Pass promptDeleteGroup to GroupContextMenu
                   onDeleteRequest={() => promptDeleteGroup(group)}
                 />
               )}
@@ -217,10 +215,10 @@ export default function TaskGroupsBubbles({
       {/* Confirmation Dialog for Deleting Group */}
       {groupToDelete && (
         <ConfirmationDialog
-          isOpen={isConfirmDeleteDialogOpen}
-          onClose={() => {
-            setIsConfirmDeleteDialogOpen(false);
-            setGroupToDelete(null);
+          open={isConfirmDeleteDialogOpen}
+          onOpenChange={(open) => {
+            setIsConfirmDeleteDialogOpen(open);
+            if (!open) setGroupToDelete(null);
           }}
           onConfirm={() => {
             if (groupToDelete) {
@@ -230,9 +228,10 @@ export default function TaskGroupsBubbles({
             }
           }}
           title={`حذف گروه "${groupToDelete.name}"`}
-          description="آیا مطمئن هستید که می‌خواهید این گروه را حذف کنید؟ این عمل قابل بازگشت نیست. وظایف داخل گروه حذف نخواهند شد ولی بدون گروه باقی می‌مانند." // Updated description
+          description="آیا مطمئن هستید که می‌خواهید این گروه را حذف کنید؟ این عمل قابل بازگشت نیست. وظایف داخل گروه حذف نخواهند شد ولی بدون گروه باقی می‌مانند."
           confirmText="حذف گروه"
           cancelText="انصراف"
+          type="danger"
         />
       )}
     </div>

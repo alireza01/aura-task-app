@@ -4,10 +4,8 @@ import TaskDashboard from "@/components/task-dashboard"
 export default async function Home() {
   const supabase = createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  await supabase.auth.getUser()
 
-  // Always show TaskDashboard - it handles guest mode internally
-  return <TaskDashboard user={user} />
+  // TaskDashboard now handles user state internally through the store
+  return <TaskDashboard />
 }

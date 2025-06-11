@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, FolderPlus, Edit3, Sparkles } from "lucide-react"
-import type { TaskGroup, User, UserSettings } from "@/types"
+import type { TaskGroup, UserSettings, User } from "@/types"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -22,26 +22,25 @@ const groupFormSchema = z.object({
 type GroupFormData = z.infer<typeof groupFormSchema>
 
 interface GroupFormModalProps {
-  user: User | null
   settings: UserSettings | null
   isOpen: boolean
   onClose: () => void
   onGroupSaved: () => void
   groupToEdit?: TaskGroup | null
+  user: User | null
 }
 
 export default function GroupFormModal({
-  user,
   settings,
   isOpen,
   onClose,
   onGroupSaved,
   groupToEdit = null,
+  user,
 }: GroupFormModalProps) {
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const showToast = toast
-  // const supabase = createClient() // Removed, use imported supabase directly
   const isEditMode = !!groupToEdit
   const modalTitle = isEditMode ? `ویرایش گروه: ${groupToEdit.name}` : "ایجاد گروه جدید"
 
@@ -51,7 +50,6 @@ export default function GroupFormModal({
     formState: { errors },
     reset,
     watch,
-    setValue,
   } = useForm<GroupFormData>({
     resolver: zodResolver(groupFormSchema),
     defaultValues: {
@@ -135,9 +133,8 @@ export default function GroupFormModal({
 
     try {
       const groupName = data.name.trim()
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-      if (!currentUser) {
+      if (!user) {
         throw new Error("User not authenticated for group operation");
       }
 
@@ -167,7 +164,7 @@ export default function GroupFormModal({
         const { data: newGroupData, error: insertError } = await supabase
           .from("task_groups")
           .insert({
-            user_id: currentUser.id, // Use currentUser.id
+            user_id: user.id,
             name: groupName,
             emoji: "📁", // Temporary emoji
           })
@@ -176,7 +173,6 @@ export default function GroupFormModal({
 
         if (insertError) throw insertError
         if (!newGroupData) throw new Error("Failed to create new group or retrieve its data.")
-
 
         // Assign AI emoji after creation
         await assignAiEmoji(groupName, newGroupData.id)

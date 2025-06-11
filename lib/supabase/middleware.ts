@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
+import { supabaseUrl, supabaseAnonKey } from './config'
 
 // Renamed from updateSession to reflect that it primarily sets up the client and response
 export function createClient(request: NextRequest) {
@@ -11,8 +12,8 @@ export function createClient(request: NextRequest) {
   })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get(name: string) {

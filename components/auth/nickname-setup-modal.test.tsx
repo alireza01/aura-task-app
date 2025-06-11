@@ -103,12 +103,14 @@ describe('NicknameSetupModal', () => {
   it('calls Supabase update and onNicknameSet/onClose on successful submission', async () => {
     const mockEqSuccess = jest.fn().mockResolvedValue({ error: null });
     const mockUpdateSuccess = jest.fn().mockReturnValue({ eq: mockEqSuccess });
-    mockSupabaseClientInstance.from.mockImplementation((tableName) => {
-      if (tableName === 'user_profiles') {
-        return { update: mockUpdateSuccess };
-      }
-      return { update: jest.fn().mockReturnValue({ eq: jest.fn() }) }; // Default for other tables
-    });
+    mockSupabaseClientInstance.from.mockImplementation(() => ({
+      select: jest.fn(),
+      insert: jest.fn(),
+      update: mockUpdateSuccess,
+      delete: jest.fn(),
+      eq: mockEqSuccess,
+      single: jest.fn()
+    }));
 
     render(<NicknameSetupModal {...defaultProps} currentNickname="OldNick" />);
     const nicknameInput = screen.getByLabelText('اسم مستعار');
@@ -146,12 +148,14 @@ describe('NicknameSetupModal', () => {
     const updateError = { message: 'Supabase update failed', code: '12345' };
     const mockEqFailure = jest.fn().mockResolvedValue({ error: updateError });
     const mockUpdateFailure = jest.fn().mockReturnValue({ eq: mockEqFailure });
-    mockSupabaseClientInstance.from.mockImplementation((tableName) => {
-      if (tableName === 'user_profiles') {
-        return { update: mockUpdateFailure };
-      }
-      return { update: jest.fn().mockReturnValue({ eq: jest.fn() }) }; // Default for other tables
-    });
+    mockSupabaseClientInstance.from.mockImplementation(() => ({
+      select: jest.fn(),
+      insert: jest.fn(),
+      update: mockUpdateFailure,
+      delete: jest.fn(),
+      eq: mockEqFailure,
+      single: jest.fn()
+    }));
 
     render(<NicknameSetupModal {...defaultProps} />);
     const nicknameInput = screen.getByLabelText('اسم مستعار');
@@ -189,12 +193,14 @@ describe('NicknameSetupModal', () => {
     const promise = new Promise(resolve => { resolvePromise = resolve; });
     const mockEqLoading = jest.fn(() => promise);
     const mockUpdateLoading = jest.fn().mockReturnValue({ eq: mockEqLoading });
-    mockSupabaseClientInstance.from.mockImplementation((tableName) => {
-      if (tableName === 'user_profiles') {
-        return { update: mockUpdateLoading };
-      }
-      return { update: jest.fn().mockReturnValue({ eq: jest.fn() }) };
-    });
+    mockSupabaseClientInstance.from.mockImplementation(() => ({
+      select: jest.fn(),
+      insert: jest.fn(),
+      update: mockUpdateLoading,
+      delete: jest.fn(),
+      eq: mockEqLoading,
+      single: jest.fn()
+    }));
 
     render(<NicknameSetupModal {...defaultProps} />);
     const nicknameInput = screen.getByLabelText('اسم مستعار');

@@ -1,23 +1,19 @@
 "use client"
 
 import { useState } from "react"
-// TaskCard is not directly used here anymore, DraggableTaskCard wraps it.
-// import { TaskCard } from "@/components/task-card"
-import type { Task, TaskGroup as TaskGroupType, UserSettings, User, Subtask, Tag } from "@/types" // Added Subtask, Tag
+import type { Task, TaskGroup as TaskGroupType, Subtask, Tag } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Archive, RotateCcw, ChevronDown, ChevronUp } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DraggableTaskCard } from './draggable-task-card';
+import { TaskCard } from './task-card';
 
 interface TaskListProps {
   tasks: Task[]
   groups: TaskGroupType[]
-  settings: UserSettings | null
-  user: User | null
   onTasksChange: () => void
-  onGroupsChange: () => void
   onComplete: (taskId: string, completed: boolean) => Promise<void>
   onEditTask?: (task: Task) => void
   onDeleteTask?: (taskId: string) => void
@@ -29,10 +25,7 @@ interface TaskListProps {
 export default function TaskList({
   tasks,
   groups,
-  settings,
-  user,
   onTasksChange,
-  onGroupsChange,
   onComplete,
   onEditTask,
   onDeleteTask,
@@ -173,7 +166,7 @@ export default function TaskList({
                       transition={{ duration: 0.3 }}
                     >
                       <DraggableTaskCard
-                        key={task.id} // key prop should be on DraggableTaskCard itself for SortableContext
+                        key={task.id}
                         task={task}
                         onComplete={onComplete}
                         onUpdate={onTasksChange}
@@ -271,17 +264,9 @@ export default function TaskList({
                         </Button>
                       </div>
                       <div className="opacity-60">
-                        {/* We use DraggableTaskCard here as well if archived tasks were ever to be draggable,
-                            or TaskCard directly if not. For consistency in prop passing,
-                            let's assume DraggableTaskCard is okay, or use TaskCard with same props.
-                            For simplicity, using TaskCard directly as archived items are not sortable.
-                            However, to keep the prop structure consistent with what DraggableTaskCard expects
-                            for details, loadDetails, isLoadingDetails, we pass them.
-                        */}
-                        <TaskCard // Changed from DraggableTaskCard to TaskCard for non-draggable archived items
+                        <TaskCard
                           task={task}
                           onComplete={onComplete}
-                          onUpdate={onTasksChange} // onUpdate might be onTasksChange or a specific handler
                           onEdit={onEditTask}
                           onDelete={onDeleteTask}
                           details={detailedTasks[task.id]}

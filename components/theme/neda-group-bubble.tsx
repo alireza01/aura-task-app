@@ -34,7 +34,7 @@ export default function NedaGroupBubble({
 }: NedaGroupBubbleProps) {
   const [showDeleteEffect, setShowDeleteEffect] = useState(false)
   const [effectPosition, setEffectPosition] = useState({ x: 0, y: 0 })
-  const bubbleRef = useRef<HTMLDivElement>(null)
+  const bubbleRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const bubble = bubbleRef.current

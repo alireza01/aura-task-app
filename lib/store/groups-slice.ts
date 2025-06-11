@@ -1,6 +1,5 @@
 import { StoreApi } from 'zustand';
 import { supabase as supabaseClient } from '@/lib/supabase/client'; // Changed import and aliased
-import type { SupabaseClient } from '@supabase/supabase-js'; // Added type import
 import type { User, TaskGroup } from '@/types'; // UserProfile not used directly in this slice state
 import { AppState } from './index'; // Required for AppState type in get()
 

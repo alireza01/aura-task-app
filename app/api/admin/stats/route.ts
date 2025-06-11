@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { checkAdminRole } from '@/lib/auth/utils';
 import { serverLogger } from '@/lib/logger';
 
-export async function GET(request: Request) {
+export async function GET() {
   const supabase = createClient();
 
   if (!(await checkAdminRole(supabase))) {

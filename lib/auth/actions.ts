@@ -2,14 +2,12 @@
 
 // In lib/auth/actions.ts
 
-import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server' // Assuming this is the correct path
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation';
 
 export async function createGuestUser() {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore); // Uses the server client via cookies
+  const supabase = createClient(); // Remove cookieStore parameter
 
   // Generate random credentials for the guest user
   // In a real app, you might want a more robust way to handle guest identities
@@ -45,8 +43,7 @@ export async function createGuestUser() {
 }
 
 export async function signOut() {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createClient(); // Remove cookieStore parameter
 
   console.log('Server: Attempting to sign out user.');
 

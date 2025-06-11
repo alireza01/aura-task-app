@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { DraggableTaskCard } from "@/components/draggable-task-card"
-import { TaskCard } from "@/components/task-card"
 import type { Task, TaskGroup as TaskGroupType } from "@/types"
 import { ChevronDown, ChevronUp } from "lucide-react"
 
@@ -25,6 +24,10 @@ interface TaskGroupProps {
   onTaskComplete: (taskId: string, completed: boolean) => Promise<void>
   /** Callback function to trigger a refresh of tasks, typically after an update. */
   onTasksChange: () => void
+  /** Callback function to load task details */
+  loadDetails: () => void
+  /** Whether task details are currently loading */
+  isLoadingDetails: boolean
 }
 
 /**
@@ -34,7 +37,16 @@ interface TaskGroupProps {
  * @param {TaskGroupProps} props - The properties for the TaskGroup component.
  * @returns {JSX.Element} A Card component representing the task group.
  */
-export default function TaskGroup({ group, tasks, expanded, onToggle, onTaskComplete, onTasksChange }: TaskGroupProps) {
+export default function TaskGroup({ 
+  group, 
+  tasks, 
+  expanded, 
+  onToggle, 
+  onTaskComplete, 
+  onTasksChange,
+  loadDetails,
+  isLoadingDetails 
+}: TaskGroupProps) {
   // Calculate the number of completed tasks within the group
   const completedTasks = tasks.filter((task) => task.completed).length
   // Get the total number of tasks in the group
@@ -84,6 +96,8 @@ export default function TaskGroup({ group, tasks, expanded, onToggle, onTaskComp
                     task={task}
                     onComplete={onTaskComplete}
                     onUpdate={onTasksChange}
+                    loadDetails={loadDetails}
+                    isLoadingDetails={isLoadingDetails}
                   />
                 ))}
 

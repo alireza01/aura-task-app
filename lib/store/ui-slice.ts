@@ -32,8 +32,7 @@ export interface UiSliceState {
 export type UiSlice = UiSliceState;
 
 export const createUiSlice = (
-  set: StoreApi<AppState>['setState'],
-  get: StoreApi<AppState>['getState'] // get is not used in this slice, but included for consistency
+  set: StoreApi<AppState>['setState']
 ): UiSlice => ({
   // Initial State
   isSettingsPanelOpen: false,

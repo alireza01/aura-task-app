@@ -1,7 +1,6 @@
 // app/api/user/theme/route.ts
 // import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Replaced
 import { createClient } from '@/lib/supabase/server'; // Use the server client
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { serverLogger } from '@/lib/logger';

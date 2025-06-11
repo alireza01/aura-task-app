@@ -11,13 +11,16 @@ interface DraggableTaskCardProps {
   onUpdate: () => void
   onEdit?: (task: Task) => void
   onDelete?: (taskId: string) => void
-  details?: { subtasks: Subtask[], tags: Tag[] } | null
-  loadDetails?: () => void
-  isLoadingDetails?: boolean
+  details?: {
+    subtasks: Subtask[]
+    tags: Tag[]
+  }
+  loadDetails: () => void
+  isLoadingDetails: boolean
 }
 
 export function DraggableTaskCard(props: DraggableTaskCardProps) {
-  const { task, details, loadDetails, isLoadingDetails } = props;
+  const { task } = props;
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id })
 
   const style = {

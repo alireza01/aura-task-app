@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { serverLogger } from "@/lib/logger";
 
@@ -13,8 +12,7 @@ const processTaskSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore); // This is createRouteHandlerClient equivalent
+  const supabase = createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -28,7 +26,7 @@ export async function POST(request: NextRequest) {
     const validation = processTaskSchema.safeParse(body);
 
     if (!validation.success) {
-      serverLogger.error("API Validation Error", { body }, validation.error);
+      serverLogger.error("API Validation Error", { body, error: validation.error });
       return NextResponse.json({ error: "Invalid input.", issues: validation.error.format() }, { status: 400 });
     }
 
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: zero rows returned
-      serverLogger.error(`Error fetching user settings for user ${userId}`, { userId }, settingsError);
+      serverLogger.error(`Error fetching user settings for user ${userId}`, { userId, error: settingsError });
       // Depending on policy, might return error if settings are crucial
     }
 
@@ -98,7 +96,6 @@ export async function POST(request: NextRequest) {
     };
 
     let success = false;
-    let usedKeyType: 'user' | 'admin' | null = null;
     let attemptUserKey = true;
 
     async function attemptApiCall(apiKey: string, keyType: 'user' | 'admin', adminKeyId?: string): Promise<boolean> {
@@ -106,8 +103,8 @@ export async function POST(request: NextRequest) {
         serverLogger.info(`Attempting AI call with ${keyType} key...`, { keyType, adminKeyId, userId, title });
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: modelName });
-        const chat = model.startChat({ generationConfig, history: [{ role: "user", parts: [{ text: prompt }] }] });
-        const genResult = await chat.sendMessage("generate");
+        const chat = model.startChat({ generationConfig });
+        const genResult = await chat.sendMessage(prompt);
         const aiResponse = genResult.response;
         const aiText = aiResponse.text();
 
@@ -120,16 +117,16 @@ export async function POST(request: NextRequest) {
               importanceScore: aiResult.importanceScore === undefined && !autoRanking ? defaultResult.importanceScore : (aiResult.importanceScore ?? defaultResult.importanceScore),
               emoji: aiResult.emoji || defaultResult.emoji,
               subtasks: aiResult.subtasks || defaultResult.subtasks,
-              tags: autoTaggingEnabled ? (aiResult.tags || []) : [], // Process tags if autoTaggingEnabled
+              tags: autoTaggingEnabled ? (aiResult.tags || []) : [],
+              title: validation.data?.title || title // Use validation data if available, fallback to original title
             };
             if (result.speedScore < 1) result.speedScore = 1; if (result.speedScore > 20) result.speedScore = 20;
             if (result.importanceScore < 1) result.importanceScore = 1; if (result.importanceScore > 20) result.importanceScore = 20;
 
-            usedKeyType = keyType;
             serverLogger.info(`Successfully processed task with ${keyType} key.`, { keyType, adminKeyId, userId, title });
             if (keyType === 'admin' && adminKeyId) {
               supabase.from('admin_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', adminKeyId)
-                .then(({ error }) => { if (error) serverLogger.warn(`Failed to update last_used_at for admin key ${adminKeyId}`, { adminKeyId }, error); });
+                .then(({ error }) => { if (error) serverLogger.warn(`Failed to update last_used_at for admin key ${adminKeyId}`, { adminKeyId, error }); });
             }
             return true;
           } else {
@@ -142,7 +139,7 @@ export async function POST(request: NextRequest) {
         }
       } catch (apiError: unknown) {
         const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
-        serverLogger.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'})`, { keyType, adminKeyId, userId, title, errorMessage }, apiError as Error);
+        serverLogger.warn(`Gemini API call failed for ${keyType} key (ID: ${adminKeyId || 'N/A'})`, { keyType, adminKeyId, userId, title, errorMessage, error: apiError });
         if (errorMessage && (errorMessage.includes('API key not valid') || errorMessage.includes('API key is invalid') || errorMessage.includes('quota'))) {
           if (keyType === 'user') {
             serverLogger.info("User API key failed with auth/quota error. Will attempt admin keys.", { userId, title });
@@ -220,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    serverLogger.error("Error processing task", { userId, title }, error as Error);
+    serverLogger.error("Error processing task", { userId, error: error as Error });
     const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: errorMessage || "Failed to process task" }, { status: 500 });
   }

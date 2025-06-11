@@ -157,7 +157,9 @@ export default function Dropdown({ options, value, placeholder, onSelect, classN
               <div className="max-h-60 overflow-y-auto custom-scrollbar">
                 {options.map((option, index) => (
                   <button
-                    ref={(el) => (optionRefs.current[index] = el)}
+                    ref={(el) => {
+                      optionRefs.current[index] = el;
+                    }}
                     id={`dropdown-option-${option.value}`}
                     key={option.value}
                     type="button"

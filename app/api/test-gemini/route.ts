@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"; // HarmCategory, HarmBlockThreshold removed as not used
 import { z } from "zod";
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 import { serverLogger } from '@/lib/logger';
 
 const testGeminiSchema = z.object({

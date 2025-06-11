@@ -82,7 +82,7 @@ export default function StatsDashboard({ tasks }: StatsDashboardProps) {
     <div className="space-y-6">
       {/* Main Stats */}
       <div className="grid grid-cols-2 gap-3">
-        {statCards.map((stat, index) => (
+        {statCards.map((stat) => (
           <motion.div
             key={stat.title}
             initial={{ opacity: 0, y: 20 }}

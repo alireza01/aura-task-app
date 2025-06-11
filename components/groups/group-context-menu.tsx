@@ -10,10 +10,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Edit3, Trash2, FolderOpen } from "lucide-react"
-import type { TaskGroup, User, UserSettings } from "@/types"
+import type { TaskGroup, UserSettings, User } from "@/types"
 import GroupFormModal from "./group-form-modal"
-import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 
 interface GroupContextMenuProps {
   group: TaskGroup
@@ -21,7 +19,7 @@ interface GroupContextMenuProps {
   settings: UserSettings | null
   onGroupsChange: () => void
   taskCount?: number
-  onDeleteRequest: (group: TaskGroup) => void; // Added prop
+  onDeleteRequest: (group: TaskGroup) => void
 }
 
 export default function GroupContextMenu({
@@ -30,12 +28,10 @@ export default function GroupContextMenu({
   settings,
   onGroupsChange,
   taskCount = 0,
-  onDeleteRequest, // Added prop
+  onDeleteRequest,
 }: GroupContextMenuProps) {
   const [showEditModal, setShowEditModal] = useState(false)
   // const [loading, setLoading] = useState(false) // Loading state for delete will be handled by parent/dialog
-  const showToast = toast
-  // const supabase = createClient() // Supabase client not needed here for delete
 
   // Local handleDeleteGroup is removed. Action is passed to parent via onDeleteRequest.
   // The check for taskCount > 0 should ideally be done in the parent before showing the dialog,
@@ -73,12 +69,12 @@ export default function GroupContextMenu({
       </DropdownMenu>
 
       <GroupFormModal
-        user={user}
         settings={settings}
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         onGroupSaved={onGroupsChange}
         groupToEdit={group}
+        user={user}
       />
     </>
   )

@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Task, User } from "@/types"
 import { Archive, RotateCcw, Trash2, Calendar, Clock } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useLocalStorage } from "../hooks/use-local-storage"
 import { useToast } from "@/components/ui/use-toast"
 
 interface ArchiveViewProps {
@@ -16,7 +16,7 @@ interface ArchiveViewProps {
   archivedTasks: Task[]
   onTasksChange: () => void
   isVisible: boolean
-  onToggleVisibility: () => void // Renamed from onToggle
+  onToggleVisibility: () => void
 }
 
 export default function ArchiveView({
@@ -24,15 +24,14 @@ export default function ArchiveView({
   archivedTasks,
   onTasksChange,
   isVisible,
-  onToggleVisibility, // Renamed from onToggle
+  onToggleVisibility,
 }: ArchiveViewProps) {
   const [localTasks, setLocalTasks] = useLocalStorage<Task[]>("aura-tasks", [])
   const [loading, setLoading] = useState<string | null>(null)
   const { toast } = useToast()
-  const supabase = createClient()
 
-  const handleUnarchive = async (taskId: string) => {
-    setLoading(taskId)
+  const handleUnarchive = async (task: Task) => {
+    setLoading(task.id)
 
     try {
       if (user && supabase) {
@@ -42,10 +41,10 @@ export default function ArchiveView({
             completed: false,
             completed_at: null,
           })
-          .eq("id", taskId)
+          .eq("id", task.id)
       } else {
-        const updatedTasks = localTasks.map((task) =>
-          task.id === taskId ? { ...task, completed: false, completed_at: null } : task,
+        const updatedTasks = localTasks.map((t: Task) =>
+          t.id === task.id ? { ...t, completed: false, completed_at: null } : t,
         )
         setLocalTasks(updatedTasks)
       }
@@ -68,18 +67,18 @@ export default function ArchiveView({
     }
   }
 
-  const handlePermanentDelete = async (taskId: string) => {
+  const handlePermanentDelete = async (task: Task) => {
     if (!confirm("آیا مطمئن هستید که می‌خواهید این وظیفه را برای همیشه حذف کنید؟")) {
       return
     }
 
-    setLoading(taskId)
+    setLoading(task.id)
 
     try {
       if (user && supabase) {
-        await supabase.from("tasks").delete().eq("id", taskId)
+        await supabase.from("tasks").delete().eq("id", task.id)
       } else {
-        const updatedTasks = localTasks.filter((task) => task.id !== taskId)
+        const updatedTasks = localTasks.filter((t: Task) => t.id !== task.id)
         setLocalTasks(updatedTasks)
       }
 
@@ -204,7 +203,7 @@ export default function ArchiveView({
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleUnarchive(task.id)}
+                            onClick={() => handleUnarchive(task)}
                             disabled={loading === task.id}
                             className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
                             title="بازگردانی از آرشیو"
@@ -217,7 +216,7 @@ export default function ArchiveView({
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handlePermanentDelete(task.id)}
+                            onClick={() => handlePermanentDelete(task)}
                             disabled={loading === task.id}
                             className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                             title="حذف دائمی"
