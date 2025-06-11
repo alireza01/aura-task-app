@@ -42,11 +42,6 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
   }
 
   useEffect(() => {
-    setStoredValue(readValue())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === key && e.newValue) {
         setStoredValue(JSON.parse(e.newValue))
